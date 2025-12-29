@@ -1,0 +1,899 @@
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import { useStore } from '../store/useStore';
+import { Shot } from '../types';
+
+interface TableViewProps {
+  onSelect: (id: string, type: 'project' | 'scene' | 'shot' | 'frame') => void;
+}
+
+export function TableView({ onSelect }: TableViewProps) {
+  const shots = useStore((state) => state.shots);
+  const scenes = useStore((state) => state.scenes);
+  const frames = useStore((state) => state.frames);
+  const createShot = useStore((state) => state.createShot);
+  const updateShot = useStore((state) => state.updateShot);
+  const deleteShot = useStore((state) => state.deleteShot);
+  const bulkUpdateShots = useStore((state) => state.bulkUpdateShots);
+  const reorderShots = useStore((state) => state.reorderShots);
+  const createScene = useStore((state) => state.createScene);
+  const updateScene = useStore((state) => state.updateScene);
+  const addFrame = useStore((state) => state.addFrame);
+  const [selectedCell, setSelectedCell] = useState<{ rowId: string; field: string } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ rowId: string; field: string; value: string } | null>(null);
+  const [editingScene, setEditingScene] = useState<{ sceneId: string; value: string } | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [compactMode, setCompactMode] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState<Map<string, number>>(new Map());
+  const [hoverPreview, setHoverPreview] = useState<{ image: string; x: number; y: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sort scenes by sceneNumber (low to high)
+  // CRITICAL: Sort by sceneNumber (as number) not orderIndex
+  const sortedScenes = useMemo(() => {
+    return [...scenes].sort((a, b) => {
+      const numA = parseInt(a.sceneNumber, 10) || 0;
+      const numB = parseInt(b.sceneNumber, 10) || 0;
+      return numA - numB;
+    });
+  }, [scenes]);
+
+  // Sort shots by sceneNumber first, then by shotCode
+  // CRITICAL: Sort by sceneNumber (as number), then shotCode (as number)
+  const sortedShots = useMemo(() => {
+    return [...shots].sort((a, b) => {
+      // Get scene numbers
+      const sceneA = scenes.find(s => s.id === a.sceneId);
+      const sceneB = scenes.find(s => s.id === b.sceneId);
+      const sceneNumA = sceneA ? (parseInt(sceneA.sceneNumber, 10) || 0) : 9999; // Unassigned goes last
+      const sceneNumB = sceneB ? (parseInt(sceneB.sceneNumber, 10) || 0) : 9999;
+      
+      // First sort by scene number
+      if (sceneNumA !== sceneNumB) {
+        return sceneNumA - sceneNumB;
+      }
+      
+      // Then sort by shot code (as number)
+      const shotNumA = parseInt(a.shotCode, 10) || 0;
+      const shotNumB = parseInt(b.shotCode, 10) || 0;
+      return shotNumA - shotNumB;
+    });
+  }, [shots, scenes]);
+
+  // Group shots by scene, with shots sorted within each scene
+  // CRITICAL: This always groups by scene - there is no toggle anymore
+  // Scenes are sorted by sceneNumber (low to high)
+  // Shots within each scene are sorted by shotCode (low to high)
+  const shotsByScene = useMemo(() => {
+    const map = new Map<string, Shot[]>();
+    sortedShots.forEach((shot) => {
+      const key = shot.sceneId || 'unassigned';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(shot);
+    });
+    // Ensure shots within each scene are sorted by shotCode (as number)
+    map.forEach((sceneShots, key) => {
+      map.set(key, sceneShots.sort((a, b) => {
+        const shotNumA = parseInt(a.shotCode, 10) || 0;
+        const shotNumB = parseInt(b.shotCode, 10) || 0;
+        return shotNumA - shotNumB;
+      }));
+    });
+    return map;
+  }, [sortedShots]);
+
+  const getShotFrames = (shotId: string) => {
+    return frames.filter((f) => f.shotId === shotId).sort((a, b) => a.orderIndex - b.orderIndex);
+  };
+
+  const handleCellClick = useCallback((rowId: string, field: string, currentValue: any) => {
+    setSelectedCell({ rowId, field });
+    setEditingCell({ rowId, field, value: String(currentValue || '') });
+  }, []);
+
+  const handleCellBlur = useCallback(() => {
+    if (editingCell) {
+      const { rowId, field, value } = editingCell;
+      const shot = shots.find((s) => s.id === rowId);
+      if (shot) {
+        if (field === 'shotCode') {
+          updateShot(rowId, { shotCode: value });
+        } else         if (field === 'scriptText') {
+          updateShot(rowId, { scriptText: value });
+        } else if (field === 'generalNotes') {
+          updateShot(rowId, { generalNotes: value });
+        }
+      }
+    }
+    setEditingCell(null);
+    setSelectedCell(null);
+  }, [editingCell, shots, updateShot]);
+
+  const handleCellChange = useCallback((value: string) => {
+    setEditingCell((prev) => {
+      if (!prev) return null;
+      return { ...prev, value };
+    });
+  }, []);
+
+  const handleCellKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      (e.currentTarget as HTMLElement).blur();
+    } else if (e.key === 'Escape') {
+      setEditingCell(null);
+      setSelectedCell(null);
+    }
+  }, []);
+
+  const handleAddRow = () => {
+    // createShot will automatically assign to scene 0 if no sceneId provided
+    createShot();
+  };
+
+  const handleDeleteRow = (shotId: string) => {
+    if (confirm('Delete this shot?')) {
+      deleteShot(shotId);
+    }
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedRows.size === 0) return;
+    if (confirm(`Delete ${selectedRows.size} selected shot(s)?`)) {
+      selectedRows.forEach((id) => deleteShot(id));
+      setSelectedRows(new Set());
+    }
+  };
+
+  const handleBatchSceneChange = (sceneId: string) => {
+    if (selectedRows.size === 0) return;
+    bulkUpdateShots(Array.from(selectedRows), { sceneId: sceneId || undefined });
+    setSelectedRows(new Set());
+  };
+
+  const handleBatchMove = (direction: 'up' | 'down') => {
+    if (selectedRows.size === 0) return;
+    const selectedIds = Array.from(selectedRows);
+    const currentOrder = sortedShots.map(s => s.id);
+    const newOrder = [...currentOrder];
+    
+    if (direction === 'up') {
+      const minIndex = Math.min(...selectedIds.map(id => newOrder.indexOf(id)));
+      if (minIndex > 0) {
+        selectedIds.forEach(id => {
+          const idx = newOrder.indexOf(id);
+          if (idx !== -1) newOrder.splice(idx, 1);
+        });
+        selectedIds.reverse().forEach(id => {
+          newOrder.splice(minIndex - 1, 0, id);
+        });
+        reorderShots(newOrder);
+      }
+    } else {
+      const maxIndex = Math.max(...selectedIds.map(id => newOrder.indexOf(id)));
+      if (maxIndex < newOrder.length - 1) {
+        selectedIds.forEach(id => {
+          const idx = newOrder.indexOf(id);
+          if (idx !== -1) newOrder.splice(idx, 1);
+        });
+        const insertPos = maxIndex - selectedIds.length + 2;
+        selectedIds.forEach(id => {
+          newOrder.splice(insertPos, 0, id);
+        });
+        reorderShots(newOrder);
+      }
+    }
+  };
+
+  const handleAddRowToScene = (sceneId?: string) => {
+    createShot(sceneId);
+  };
+
+
+  /**
+   * CRITICAL: Reordering function - DO NOT REMOVE
+   * Moves a shot up or down in the order and updates shot codes automatically.
+   * This replaces drag-and-drop functionality.
+   * The reorderShots function in the store automatically recalculates shot codes.
+   */
+  const handleMoveShot = (shotId: string, direction: 'up' | 'down') => {
+    const currentIndex = sortedShots.findIndex((s) => s.id === shotId);
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= sortedShots.length) return;
+    
+    const newOrder = Array.from(sortedShots.map((s) => s.id));
+    const [removed] = newOrder.splice(currentIndex, 1);
+    newOrder.splice(newIndex, 0, removed);
+    // This automatically updates shot codes based on new order
+    reorderShots(newOrder);
+  };
+
+  const handleImageUpload = (shotId: string, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            addFrame(shotId, e.target.result as string);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  const handleThumbnailClick = (shotId: string) => {
+    if (fileInputRef.current) {
+      fileInputRef.current.setAttribute('data-shot-id', shotId);
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleImageIndexChange = useCallback((shotId: string, index: number) => {
+    setCurrentImageIndex((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(shotId, index);
+      return newMap;
+    });
+  }, []);
+
+  const handleImageHover = useCallback((image: string | null, x: number, y: number) => {
+    if (image) {
+      setHoverPreview({ image, x, y });
+    } else {
+      setHoverPreview(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (hoverPreview) {
+        setHoverPreview((prev) => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [hoverPreview]);
+
+  useEffect(() => {
+    if (editingCell) {
+      if (editingCell.field === 'scriptText' && textareaRef.current) {
+        textareaRef.current.focus();
+        // Don't select all - let user type normally
+      } else if (inputRef.current) {
+        inputRef.current.focus();
+        // Don't select all - let user type normally
+      }
+    }
+  }, [editingCell]);
+
+
+  // Handle keyboard shortcuts for batch move
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (selectedRows.size === 0) return;
+      if (e.key === 'ArrowUp' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleBatchMove('up');
+      } else if (e.key === 'ArrowDown' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleBatchMove('down');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedRows, sortedShots]);
+
+  return (
+    <div className="w-full h-full flex flex-col bg-white">
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleAddRow}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+          >
+            + Add Row
+          </button>
+          <button
+            onClick={() => createScene()}
+            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm font-medium"
+          >
+            + Add Scene
+          </button>
+          {selectedRows.size > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">{selectedRows.size} selected</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleBatchMove('up')}
+                  className="p-1 text-gray-400 hover:text-gray-600"
+                  title="Move up (Cmd/Ctrl+↑)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleBatchMove('down')}
+                  className="p-1 text-gray-400 hover:text-gray-600"
+                  title="Move down (Cmd/Ctrl+↓)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+              <select
+                onChange={(e) => {
+                  if (e.target.value.startsWith('scene:')) {
+                    handleBatchSceneChange(e.target.value.split(':')[1]);
+                  }
+                  e.target.value = '';
+                }}
+                className="px-3 py-1 border border-gray-300 rounded text-sm"
+                defaultValue=""
+              >
+                <option value="">Move to scene...</option>
+                <option value="scene:">Unassigned</option>
+                {sortedScenes.map((s) => (
+                  <option key={s.id} value={`scene:${s.id}`}>
+                    {s.sceneNumber}: {s.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleBatchDelete}
+                className="px-3 py-1 text-red-600 hover:bg-red-50 rounded text-sm border border-red-300 hover:border-red-400 flex items-center gap-1"
+                title="Delete selected"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={compactMode}
+            onChange={(e) => setCompactMode(e.target.checked)}
+          />
+          Compact Mode
+        </label>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const shotId = e.currentTarget.getAttribute('data-shot-id');
+          if (shotId) {
+            handleImageUpload(shotId, e.target.files);
+            e.currentTarget.value = '';
+          }
+        }}
+      />
+      
+      {hoverPreview && (
+        <div
+          className="fixed pointer-events-none z-50"
+          style={{
+            left: `${hoverPreview.x + 20}px`,
+            top: `${hoverPreview.y + 20}px`,
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <img
+            src={hoverPreview.image}
+            alt="Preview"
+            className="max-w-md max-h-md border-2 border-gray-300 rounded shadow-2xl"
+            style={{ maxWidth: '400px', maxHeight: '400px', objectFit: 'contain' }}
+          />
+        </div>
+      )}
+
+      <div className="flex-1 overflow-auto">
+        <table className="w-full border-collapse">
+          <thead className="bg-gray-50 sticky top-0 z-10">
+            <tr>
+              {!compactMode && <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 w-8"></th>}
+              {!compactMode && <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 w-8"></th>}
+              <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 w-20">Shot</th>
+              <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 w-24">Thumbnail</th>
+              <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700">Script</th>
+              <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700">General Notes</th>
+              {!compactMode && <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 w-20">Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {/* 
+              CRITICAL: Always group by scene - no conditional rendering
+              The table ALWAYS displays shots grouped by scene.
+              Sorting: Scenes by sceneNumber (low to high), Shots by shotCode (low to high)
+              When refactoring, DO NOT add back conditional rendering like:
+                {groupByScene ? ... : sortedShots.map(...)}
+              If removing conditionals, ensure ALL branches are removed, not just one.
+            */}
+            {Array.from(shotsByScene.entries()).sort(([sceneIdA], [sceneIdB]) => {
+              // Sort scene entries by sceneNumber
+              if (sceneIdA === 'unassigned') return 1;
+              if (sceneIdB === 'unassigned') return -1;
+              const sceneA = scenes.find(s => s.id === sceneIdA);
+              const sceneB = scenes.find(s => s.id === sceneIdB);
+              const numA = sceneA ? (parseInt(sceneA.sceneNumber, 10) || 0) : 0;
+              const numB = sceneB ? (parseInt(sceneB.sceneNumber, 10) || 0) : 0;
+              return numA - numB;
+            }).map(([sceneId, sceneShots]) => {
+                        const scene = scenes.find((s) => s.id === sceneId);
+                        const isUnassigned = sceneId === 'unassigned';
+                        return (
+                          <React.Fragment key={sceneId}>
+                            <tr className="bg-gray-100">
+                              <td colSpan={compactMode ? 4 : 6} className="p-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    {isUnassigned ? (
+                                      <span className="font-semibold text-sm text-gray-700">Unassigned</span>
+                                    ) : (
+                                      <input
+                                    type="text"
+                                    value={editingScene?.sceneId === sceneId ? editingScene.value : (scene?.title || '')}
+                                    onChange={(e) => {
+                                      if (scene) {
+                                        setEditingScene({ sceneId: scene.id, value: e.target.value });
+                                      }
+                                    }}
+                                    onFocus={() => {
+                                      if (scene) {
+                                        setEditingScene({ sceneId: scene.id, value: scene.title || '' });
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      if (scene && editingScene?.sceneId === scene.id) {
+                                        const finalValue = editingScene.value.trim() || `Scene ${scene.sceneNumber}`;
+                                        updateScene(scene.id, { title: finalValue });
+                                        setEditingScene(null);
+                                      }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      // Allow standard keyboard shortcuts
+                                      if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                                        return; // Let browser handle these
+                                      }
+                                      if (e.key === 'Enter') {
+                                        e.currentTarget.blur();
+                                      } else if (e.key === 'Escape') {
+                                        setEditingScene(null);
+                                        e.currentTarget.blur();
+                                      }
+                                    }}
+                                    className="font-semibold text-sm text-gray-700 bg-transparent border-b border-gray-400 focus:outline-none focus:border-blue-500"
+                                    placeholder={`Scene ${scene?.sceneNumber}`}
+                                  />
+                                    )}
+                                    <span className="text-xs text-gray-500">
+                                      ({sceneShots.length} shots)
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleAddRowToScene(isUnassigned ? undefined : sceneId)}
+                                    className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                  >
+                                    + Add Row
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                            {sceneShots.map((shot) => {
+                              const globalIndex = sortedShots.findIndex((s) => s.id === shot.id);
+                              const canMoveUp = globalIndex > 0;
+                              const canMoveDown = globalIndex < sortedShots.length - 1;
+                              return (
+                                <ShotRow
+                                  key={shot.id}
+                                  shot={shot}
+                                  frames={getShotFrames(shot.id)}
+                                  selectedCell={selectedCell}
+                                  editingCell={editingCell}
+                                  inputRef={inputRef}
+                                  textareaRef={textareaRef}
+                                  isSelected={selectedRows.has(shot.id)}
+                                  isDragging={false}
+                                  currentImageIndex={currentImageIndex.get(shot.id) || 0}
+                                  canMoveUp={canMoveUp}
+                                  canMoveDown={canMoveDown}
+                                  onCellClick={handleCellClick}
+                                  onCellBlur={handleCellBlur}
+                                  onCellKeyDown={handleCellKeyDown}
+                                  onCellChange={handleCellChange}
+                                  onSelect={() => onSelect(shot.id, 'shot')}
+                                  onDelete={() => handleDeleteRow(shot.id)}
+                                  onToggleSelect={(id) => {
+                                    const newSelected = new Set(selectedRows);
+                                    if (newSelected.has(id)) {
+                                      newSelected.delete(id);
+                                    } else {
+                                      newSelected.add(id);
+                                    }
+                                    setSelectedRows(newSelected);
+                                  }}
+                                  onThumbnailClick={() => handleThumbnailClick(shot.id)}
+                                  onImageIndexChange={handleImageIndexChange}
+                                  onImageHover={handleImageHover}
+                                  onMoveUp={() => handleMoveShot(shot.id, 'up')}
+                                  onMoveDown={() => handleMoveShot(shot.id, 'down')}
+                                  compactMode={compactMode}
+                                />
+                              );
+                            })}
+                          </React.Fragment>
+                        );
+                      })}
+                </tbody>
+          </table>
+      </div>
+    </div>
+  );
+}
+
+interface ShotRowProps {
+  shot: Shot;
+  frames: any[];
+  selectedCell: { rowId: string; field: string } | null;
+  editingCell: { rowId: string; field: string; value: string } | null;
+  inputRef: React.RefObject<HTMLInputElement>;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  isSelected: boolean;
+  isDragging: boolean;
+  currentImageIndex: number;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onCellClick: (rowId: string, field: string, currentValue: any) => void;
+  onCellBlur: () => void;
+  onCellKeyDown: (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onCellChange: (value: string) => void;
+  onSelect: () => void;
+  onDelete: () => void;
+  onToggleSelect: (id: string) => void;
+  onThumbnailClick: () => void;
+  onImageIndexChange: (shotId: string, index: number) => void;
+  onImageHover: (image: string | null, x: number, y: number) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  compactMode: boolean;
+}
+
+interface ImageThumbnailProps {
+  frames: any[];
+  currentImageIndex: number;
+  shotId: string;
+  onThumbnailClick: () => void;
+  onImageIndexChange: (shotId: string, index: number) => void;
+  onImageHover: (image: string | null, x: number, y: number) => void;
+}
+
+const ImageThumbnail = React.memo(function ImageThumbnail({
+  frames,
+  currentImageIndex,
+  shotId,
+  onThumbnailClick,
+  onImageIndexChange,
+  onImageHover,
+}: ImageThumbnailProps) {
+  const hoverTimeoutRef = React.useRef<number | null>(null);
+  const isPreviewShowingRef = React.useRef(false);
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      isPreviewShowingRef.current = true;
+      onImageHover(frames[currentImageIndex]?.image || null, e.clientX, e.clientY);
+    }, 800);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current !== null) {
+      window.clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    isPreviewShowingRef.current = false;
+    onImageHover(null, 0, 0);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isPreviewShowingRef.current) {
+      // Preview is already showing, update position
+      onImageHover(frames[currentImageIndex]?.image || null, e.clientX, e.clientY);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      {frames.length > 1 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            const newIndex = currentImageIndex > 0 ? currentImageIndex - 1 : frames.length - 1;
+            onImageIndexChange(shotId, newIndex);
+          }}
+          className="p-0.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Previous image"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
+      <div
+        className="w-16 h-10 relative cursor-pointer group"
+        onClick={(e) => {
+          e.stopPropagation();
+          onThumbnailClick();
+        }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onMouseMove={handleMouseMove}
+      >
+        <img
+          src={frames[currentImageIndex]?.image || frames[0]?.image}
+          alt=""
+          className="w-full h-full object-cover rounded border border-gray-300"
+        />
+        {frames.length > 1 && (
+          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs text-center py-0.5 font-semibold">
+            {currentImageIndex + 1}/{frames.length}
+          </div>
+        )}
+      </div>
+      {frames.length > 1 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            const newIndex = currentImageIndex < frames.length - 1 ? currentImageIndex + 1 : 0;
+            onImageIndexChange(shotId, newIndex);
+          }}
+          className="p-0.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Next image"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+});
+
+const ShotRow = React.memo(function ShotRow({
+  shot,
+  frames,
+  selectedCell,
+  editingCell,
+  inputRef,
+  textareaRef,
+  isSelected,
+  isDragging,
+  currentImageIndex,
+  canMoveUp,
+  canMoveDown,
+  onCellClick,
+  onCellBlur,
+  onCellKeyDown,
+  onCellChange,
+  onSelect,
+  onDelete,
+  onToggleSelect,
+  onThumbnailClick,
+  onImageIndexChange,
+  onImageHover,
+  onMoveUp,
+  onMoveDown,
+  compactMode,
+}: ShotRowProps) {
+  const isEditing = editingCell?.rowId === shot.id;
+  const cellSelected = selectedCell?.rowId === shot.id;
+
+  const renderCell = (field: string, value: any, renderFn?: () => React.ReactNode) => {
+    if (isEditing && editingCell?.field === field) {
+      if (field === 'scriptText') {
+        return (
+          <textarea
+            ref={textareaRef}
+            value={editingCell.value}
+            onChange={(e) => {
+              e.stopPropagation();
+              onCellChange(e.target.value);
+            }}
+            onBlur={(e) => {
+              e.stopPropagation();
+              onCellBlur();
+            }}
+            onKeyDown={(e) => {
+              // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+              if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                return; // Let browser handle these
+              }
+              e.stopPropagation();
+              onCellKeyDown(e);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="w-full px-2 py-1 border border-blue-500 rounded text-sm focus:outline-none resize-none"
+            rows={3}
+          />
+        );
+      }
+      return (
+        <input
+          ref={field === editingCell.field ? inputRef : undefined}
+          type="text"
+          value={editingCell.value}
+          onChange={(e) => {
+            e.stopPropagation();
+            onCellChange(e.target.value);
+          }}
+          onBlur={(e) => {
+            e.stopPropagation();
+            onCellBlur();
+          }}
+          onKeyDown={(e) => {
+            // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+            if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+              return; // Let browser handle these
+            }
+            e.stopPropagation();
+            onCellKeyDown(e);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="w-full px-2 py-1 border border-blue-500 rounded text-sm focus:outline-none"
+        />
+      );
+    }
+    if (renderFn) {
+      return renderFn();
+    }
+    return (
+      <div
+        className={`px-2 py-1 cursor-text hover:bg-gray-50 rounded ${cellSelected && selectedCell?.field === field ? 'bg-blue-50' : ''}`}
+        onClick={() => onCellClick(shot.id, field, value)}
+      >
+        {value || <span className="text-gray-400">Click to edit</span>}
+      </div>
+    );
+  };
+
+  return (
+    <tr
+      className={`hover:bg-gray-50 ${isDragging ? 'opacity-50' : ''} ${isSelected ? 'bg-blue-50' : ''} ${compactMode ? 'h-8' : ''}`}
+    >
+      {!compactMode && (
+        <td className="p-2 border-b border-gray-100">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(shot.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="cursor-pointer"
+          />
+        </td>
+      )}
+      {!compactMode && (
+        <td className="p-2 border-b border-gray-100">
+          <div className="flex flex-col gap-0.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveUp();
+              }}
+              disabled={!canMoveUp}
+              className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Move up"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveDown();
+              }}
+              disabled={!canMoveDown}
+              className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Move down"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+        </td>
+      )}
+      <td className={`border-b border-gray-100 ${compactMode ? 'p-1' : 'p-2'}`}>
+        {renderCell('shotCode', shot.shotCode)}
+      </td>
+      <td className={`border-b border-gray-100 ${compactMode ? 'p-1' : 'p-2'}`}>
+        {frames.length > 0 ? (
+          <ImageThumbnail
+            frames={frames}
+            currentImageIndex={currentImageIndex}
+            shotId={shot.id}
+            onThumbnailClick={onThumbnailClick}
+            onImageIndexChange={onImageIndexChange}
+            onImageHover={onImageHover}
+          />
+        ) : (
+          <div
+            className="w-16 h-10 bg-gray-100 rounded border border-gray-300 flex items-center justify-center text-xs text-gray-400 cursor-pointer hover:bg-gray-200"
+            onClick={(e) => {
+              e.stopPropagation();
+              onThumbnailClick();
+            }}
+          >
+            No image
+          </div>
+        )}
+      </td>
+      <td className={`border-b border-gray-100 ${compactMode ? 'p-1' : 'p-2'}`}>
+        {renderCell('scriptText', shot.scriptText, () => (
+          <div
+            className={`px-2 py-1 cursor-text hover:bg-gray-50 rounded ${compactMode ? 'min-h-[1rem]' : 'min-h-[2rem]'} ${cellSelected && selectedCell?.field === 'scriptText' ? 'bg-blue-50' : ''}`}
+            onClick={() => onCellClick(shot.id, 'scriptText', shot.scriptText)}
+          >
+            {shot.scriptText || <span className="text-gray-400">Click to edit</span>}
+          </div>
+        ))}
+      </td>
+      <td className={`border-b border-gray-100 ${compactMode ? 'p-1' : 'p-2'}`}>
+        {renderCell('generalNotes', shot.generalNotes, () => (
+          <div
+            className={`px-2 py-1 cursor-text hover:bg-gray-50 rounded ${compactMode ? 'min-h-[1rem]' : 'min-h-[2rem]'} ${cellSelected && selectedCell?.field === 'generalNotes' ? 'bg-blue-50' : ''}`}
+            onClick={() => onCellClick(shot.id, 'generalNotes', shot.generalNotes)}
+          >
+            {shot.generalNotes || <span className="text-gray-400">Click to edit</span>}
+          </div>
+        ))}
+      </td>
+      {!compactMode && (
+        <td className="p-2 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect();
+              }}
+              className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
+              title="View details"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="p-1 text-red-600 hover:bg-red-50 rounded"
+              title="Delete"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </td>
+      )}
+    </tr>
+  );
+});
