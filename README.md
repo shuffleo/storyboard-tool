@@ -104,8 +104,6 @@ All data is stored locally in IndexedDB. The canonical data structure includes:
 - **Cmd/Ctrl+Shift+Z** or **Cmd/Ctrl+Y**: Redo
 - **Cmd/Ctrl+Arrow Up/Down**: Move selected shots up/down (in both views)
 - **Arrow Up/Down**: Navigate between shots (Storyboard view)
-- **Cmd/Ctrl+Click**: Multi-select shots (Storyboard view)
-- **Shift+Click**: Range select shots (Storyboard view)
 
 ## Performance
 
