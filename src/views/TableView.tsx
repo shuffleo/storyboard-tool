@@ -13,6 +13,7 @@ export function TableView({ onSelect }: TableViewProps) {
   const createShot = useStore((state) => state.createShot);
   const updateShot = useStore((state) => state.updateShot);
   const deleteShot = useStore((state) => state.deleteShot);
+  const deleteScene = useStore((state) => state.deleteScene);
   const bulkUpdateShots = useStore((state) => state.bulkUpdateShots);
   const reorderShots = useStore((state) => state.reorderShots);
   const createScene = useStore((state) => state.createScene);
@@ -708,14 +709,14 @@ interface ShotRowProps {
 // Auto-resizing textarea component
 const AutoResizeTextarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
   ({ value, onChange, ...props }, ref) => {
-    const internalRef = useRef<HTMLTextAreaElement>(null);
+    const internalRef = useRef<HTMLTextAreaElement | null>(null);
     
     // Combine internal ref with forwarded ref
     const combinedRef = (node: HTMLTextAreaElement | null) => {
       internalRef.current = node;
       if (typeof ref === 'function') {
         ref(node);
-      } else if (ref) {
+      } else if (ref && 'current' in ref) {
         (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = node;
       }
     };

@@ -393,9 +393,9 @@ export const useStore = create<Store>((set, get) => ({
     get().save();
   },
 
-  deleteShot: (id: string, askDeleteScene: boolean = true) => {
-    // Note: askDeleteScene is kept for backward compatibility but dialogs are now handled in UI components
-    // When askDeleteScene is false, it means the dialog was already shown and user confirmed
+  deleteShot: (id: string, _askDeleteScene: boolean = true) => {
+    // Note: _askDeleteScene is kept for backward compatibility but dialogs are now handled in UI components
+    // When _askDeleteScene is false, it means the dialog was already shown and user confirmed
     get().pushHistory();
     set((state) => ({
       shots: state.shots.filter(s => s.id !== id),

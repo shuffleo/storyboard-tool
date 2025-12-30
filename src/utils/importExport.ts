@@ -149,7 +149,6 @@ export async function exportStoryboardPDF(): Promise<void> {
   const pageHeight = pdf.internal.pageSize.height;
   const margin = 15;
   const imageWidth = 55;
-  const imageHeight = 40;
   const textWidth = pageWidth - margin * 2 - imageWidth - 10;
   const imagesPerPage = 3;
   let pageNumber = 1;
@@ -170,12 +169,12 @@ export async function exportStoryboardPDF(): Promise<void> {
     if (!scene) return;
     
     pdf.setFontSize(14);
-    pdf.setFont(undefined, 'bold');
+    pdf.setFont('helvetica', 'bold');
     const sceneTitle = scene.title && scene.title.trim() 
       ? `${scene.sceneNumber}: ${scene.title}`
       : `Scene ${scene.sceneNumber}`;
     pdf.text(sceneTitle, margin, 20);
-    pdf.setFont(undefined, 'normal');
+    pdf.setFont('helvetica', 'normal');
     currentSceneId = sceneId;
   };
 
@@ -227,7 +226,7 @@ export async function exportStoryboardPDF(): Promise<void> {
 
     // Shot code
     pdf.setFontSize(10);
-    pdf.setFont(undefined, 'bold');
+    pdf.setFont('helvetica', 'bold');
     pdf.text(`Shot ${shot.shotCode}`, margin, y);
     y += 6;
 
@@ -282,7 +281,7 @@ export async function exportStoryboardPDF(): Promise<void> {
     // Script text
     if (shot.scriptText && shot.scriptText.trim()) {
       pdf.setFontSize(9);
-      pdf.setFont(undefined, 'normal');
+      pdf.setFont('helvetica', 'normal');
       pdf.setTextColor(0, 0, 0);
       const scriptLines = pdf.splitTextToSize(shot.scriptText, textWidth);
       pdf.text(scriptLines, textX, textY);
@@ -293,7 +292,7 @@ export async function exportStoryboardPDF(): Promise<void> {
     if (shot.generalNotes && shot.generalNotes.trim()) {
       textY += 2; // Small gap
       pdf.setFontSize(9);
-      pdf.setFont(undefined, 'italic');
+      pdf.setFont('helvetica', 'italic');
       pdf.setTextColor(100, 100, 150); // Different color for general notes
       const notesLines = pdf.splitTextToSize(shot.generalNotes, textWidth);
       pdf.text(notesLines, textX, textY);

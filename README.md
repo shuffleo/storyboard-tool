@@ -188,8 +188,3 @@ The app supports Google Drive as a backend storage option. When connected, your 
   - Images are named: "shot-{Code}-frame-{Index}.png"
 
 The "Saved" time in the menu reflects the last Google Drive sync time when connected, otherwise it shows the local save time.
-
-## License
-
-MIT
-
