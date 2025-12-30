@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { ProjectState, Shot, Scene, StoryboardFrame, Sequence, Project } from '../types';
 import { db } from '../db/indexeddb';
 import { nanoid } from 'nanoid';
+import { googleDriveService } from '../utils/googleDrive';
 
 interface Store extends ProjectState {
   // Actions
@@ -22,7 +23,7 @@ interface Store extends ProjectState {
   // Shots
   createShot: (sceneId?: string) => string;
   updateShot: (id: string, updates: Partial<Shot>) => void;
-  deleteShot: (id: string) => void;
+  deleteShot: (id: string, askDeleteScene?: boolean) => void;
   reorderShots: (shotIds: string[]) => void;
   splitShot: (shotId: string, atIndex: number) => string;
   mergeShots: (shotIds: string[]) => string;
@@ -48,6 +49,14 @@ interface Store extends ProjectState {
   loadProjectState: (state: ProjectState) => void;
   isSaving: boolean;
   lastSaved: number | null;
+  
+  // Google Drive
+  isGoogleDriveConnected: boolean;
+  isGoogleSyncing: boolean;
+  lastGoogleSync: number | null;
+  connectGoogleDrive: () => Promise<void>;
+  disconnectGoogleDrive: () => Promise<void>;
+  syncToGoogleDrive: () => Promise<void>;
 }
 
 const defaultProject: Project = {
@@ -77,6 +86,9 @@ export const useStore = create<Store>((set, get) => ({
   historyIndex: -1,
   canUndo: false,
   canRedo: false,
+  isGoogleDriveConnected: false,
+  isGoogleSyncing: false,
+  lastGoogleSync: null,
 
   init: async () => {
     try {
@@ -87,12 +99,50 @@ export const useStore = create<Store>((set, get) => ({
         set({ ...saved, history: [saved], historyIndex: 0, canUndo: false, canRedo: false });
       } else {
         console.log('Store: No saved project, creating default...');
-        // Create default project
+        // Create default project with 3 scenes and 5 shots each
+        const defaultScenes: Scene[] = [];
+        const defaultShots: Shot[] = [];
+        
+        // Create 3 scenes with 5 shots each
+        for (let sceneNum = 0; sceneNum < 3; sceneNum++) {
+          const sceneId = nanoid();
+          const scene: Scene = {
+            id: sceneId,
+            sequenceId: undefined,
+            sceneNumber: String(sceneNum),
+            title: `Scene ${sceneNum}`,
+            summary: '',
+            orderIndex: sceneNum,
+            notes: '',
+          };
+          defaultScenes.push(scene);
+          
+          // Create 5 shots for this scene
+          for (let shotNum = 0; shotNum < 5; shotNum++) {
+            const shotId = nanoid();
+            const shotCode = String((sceneNum * 5 + shotNum) * 10).padStart(3, '0');
+            const shot: Shot = {
+              id: shotId,
+              sceneId: sceneId,
+              orderIndex: sceneNum * 5 + shotNum,
+              shotCode,
+              scriptText: '',
+              durationTarget: 0,
+              status: 'todo',
+              tags: [],
+              cameraNotes: '',
+              animationNotes: '',
+              generalNotes: '',
+            };
+            defaultShots.push(shot);
+          }
+        }
+        
         const state: ProjectState = {
           project: defaultProject,
           sequences: [],
-          scenes: [],
-          shots: [],
+          scenes: defaultScenes,
+          shots: defaultShots,
           frames: [],
           versions: [],
         };
@@ -148,18 +198,21 @@ export const useStore = create<Store>((set, get) => ({
     if (state.historyIndex > 0) {
       const newIndex = state.historyIndex - 1;
       const previousState = state.history[newIndex];
-      set({
-        project: { ...previousState.project },
-        sequences: [...previousState.sequences],
-        scenes: [...previousState.scenes],
-        shots: [...previousState.shots],
-        frames: [...previousState.frames],
-        versions: [...previousState.versions],
-        historyIndex: newIndex,
-        canUndo: newIndex > 0,
-        canRedo: true,
-      });
-      get().save();
+      if (previousState) {
+        set({
+          project: { ...previousState.project },
+          sequences: [...previousState.sequences],
+          scenes: [...previousState.scenes],
+          shots: [...previousState.shots],
+          frames: [...previousState.frames],
+          versions: [...previousState.versions],
+          historyIndex: newIndex,
+          canUndo: newIndex > 0,
+          canRedo: newIndex < state.history.length - 1,
+        });
+        // Don't save on undo - we're restoring a previous state
+        // The save will happen when user makes a new change
+      }
     }
   },
 
@@ -168,18 +221,21 @@ export const useStore = create<Store>((set, get) => ({
     if (state.historyIndex < state.history.length - 1) {
       const newIndex = state.historyIndex + 1;
       const nextState = state.history[newIndex];
-      set({
-        project: { ...nextState.project },
-        sequences: [...nextState.sequences],
-        scenes: [...nextState.scenes],
-        shots: [...nextState.shots],
-        frames: [...nextState.frames],
-        versions: [...nextState.versions],
-        historyIndex: newIndex,
-        canUndo: true,
-        canRedo: newIndex < state.history.length - 1,
-      });
-      get().save();
+      if (nextState) {
+        set({
+          project: { ...nextState.project },
+          sequences: [...nextState.sequences],
+          scenes: [...nextState.scenes],
+          shots: [...nextState.shots],
+          frames: [...nextState.frames],
+          versions: [...nextState.versions],
+          historyIndex: newIndex,
+          canUndo: true,
+          canRedo: newIndex < state.history.length - 1,
+        });
+        // Don't save on redo - we're restoring a previous state
+        // The save will happen when user makes a new change
+      }
     }
   },
 
@@ -253,6 +309,10 @@ export const useStore = create<Store>((set, get) => ({
     set((state) => ({
       scenes: [...state.scenes, scene],
     }));
+    
+    // Auto-create one shot for the new scene
+    get().createShot(id);
+    
     get().save();
     return id;
   },
@@ -324,14 +384,18 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   updateShot: (id: string, updates: Partial<Shot>, skipHistory = false) => {
-    if (!skipHistory) get().pushHistory();
+    if (!skipHistory) {
+      get().pushHistory();
+    }
     set((state) => ({
       shots: state.shots.map(s => s.id === id ? { ...s, ...updates } : s),
     }));
     get().save();
   },
 
-  deleteShot: (id: string) => {
+  deleteShot: (id: string, askDeleteScene: boolean = true) => {
+    // Note: askDeleteScene is kept for backward compatibility but dialogs are now handled in UI components
+    // When askDeleteScene is false, it means the dialog was already shown and user confirmed
     get().pushHistory();
     set((state) => ({
       shots: state.shots.filter(s => s.id !== id),
@@ -514,10 +578,65 @@ export const useStore = create<Store>((set, get) => ({
         frames: state.frames,
         versions: state.versions,
       });
-      set({ lastSaved: Date.now(), isSaving: false });
+      const savedTime = Date.now();
+      set({ lastSaved: savedTime, isSaving: false });
+      
+      // Auto-sync to Google Drive if connected
+      if (state.isGoogleDriveConnected) {
+        get().syncToGoogleDrive();
+      }
     } catch (error) {
       console.error('Save failed:', error);
       set({ isSaving: false });
+    }
+  },
+
+  connectGoogleDrive: async () => {
+    try {
+      await googleDriveService.initialize();
+      const connected = await googleDriveService.signIn();
+      if (connected) {
+        set({ isGoogleDriveConnected: true });
+        // Sync immediately after connecting
+        get().syncToGoogleDrive();
+      } else {
+        alert('Failed to sign in to Google Drive. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('Failed to connect to Google Drive:', error);
+      const errorMessage = error?.message || 'Unknown error';
+      alert(`Failed to connect to Google Drive: ${errorMessage}\n\nPlease check:\n1. VITE_GOOGLE_API_KEY and VITE_GOOGLE_CLIENT_ID are set in your .env file\n2. Google APIs scripts are loaded in index.html\n3. See README.md for setup instructions`);
+    }
+  },
+
+  disconnectGoogleDrive: async () => {
+    try {
+      await googleDriveService.signOut();
+      set({ isGoogleDriveConnected: false, lastGoogleSync: null });
+    } catch (error) {
+      console.error('Failed to disconnect from Google Drive:', error);
+    }
+  },
+
+  syncToGoogleDrive: async () => {
+    const state = get();
+    if (!state.isGoogleDriveConnected) return;
+
+    set({ isGoogleSyncing: true });
+    try {
+      const projectData = {
+        project: state.project,
+        sequences: state.sequences,
+        scenes: state.scenes,
+        shots: state.shots,
+        frames: state.frames,
+      };
+      await googleDriveService.syncProject(projectData);
+      set({ lastGoogleSync: Date.now(), isGoogleSyncing: false });
+    } catch (error) {
+      console.error('Google Drive sync failed:', error);
+      set({ isGoogleSyncing: false });
+      alert('Failed to sync to Google Drive. Please try again.');
     }
   },
 

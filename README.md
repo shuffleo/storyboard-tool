@@ -47,7 +47,7 @@ The built files will be in the `dist` directory, ready for static hosting (GitHu
 
 ### Creating a Project
 
-When you first open the app, a default project is created. You can edit the project details in the Inspector panel.
+When you first open the app, a default project is created with 3 scenes, each containing 5 shots. You can edit the project details in the Inspector panel.
 
 ### Adding Shots
 
@@ -58,7 +58,9 @@ When you first open the app, a default project is created. You can edit the proj
 ### Adding Scenes
 
 - Click "+ Add Scene" in the Table view
+- New scenes automatically get at least one shot created
 - Assign shots to scenes using the Scene dropdown in the table
+- When deleting the last shot in a scene, you'll be asked if you want to delete the scene as well
 
 ### Storyboard Frames
 
@@ -74,7 +76,7 @@ When you first open the app, a default project is created. You can edit the proj
 
 ### Views
 
-- **Table**: Best for detailed editing, bulk operations, and data entry. Features compact mode, scene grouping, and inline editing. Columns: Shot, Thumbnail, Script, General Notes.
+- **Table**: Best for detailed editing, bulk operations, and data entry. Features compact mode toggle (text button), scene grouping, inline editing, and auto-resizing textareas. Columns: Shot, Thumbnail, Script, General Notes.
 - **Storyboard**: Best for visual review and quick reordering. Features multi-select, keyboard navigation, and image carousel.
 
 ### Import/Export
@@ -107,6 +109,25 @@ All data is stored locally in IndexedDB. The canonical data structure includes:
 - **Cmd/Ctrl+Click**: Multi-select shots (Storyboard view)
 - **Shift+Click**: Range select shots (Storyboard view)
 
+## UI Features
+
+### Auto-Resizing Text Fields
+- Script and General Notes textareas automatically grow to fit content
+- Minimum height of 4rem, expands as you type
+- Prevents text fields from shrinking when clicked
+
+### Delete Shot/Scene
+- Deleting the last shot in a scene shows a dialog with options:
+  - Delete row only
+  - Delete row and scene
+  - Cancel
+- Deleting other shots shows a simple confirmation
+
+### Compact Mode
+- Toggle between Compact and Detailed views in Table view
+- Text button toggle (matches StoryboardView style)
+- Hides checkbox, arrow buttons, and actions columns in compact mode
+
 ## Performance
 
 Optimized for:
@@ -121,6 +142,52 @@ Modern browsers with IndexedDB support:
 - Chrome/Edge (latest)
 - Firefox (latest)
 - Safari (latest)
+
+## Google Drive Integration
+
+The app supports Google Drive as a backend storage option. When connected, your project data syncs to Google Sheets and images are stored in scene-named folders on Google Drive.
+
+### Setup
+
+1. **Create Google Cloud Project**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable the following APIs:
+     - Google Drive API
+     - Google Sheets API
+
+2. **Create OAuth 2.0 Credentials**:
+   - Go to "APIs & Services" > "Credentials"
+   - Click "Create Credentials" > "OAuth client ID"
+   - Choose "Web application"
+   - Add your domain to "Authorized JavaScript origins"
+   - Copy the Client ID
+
+3. **Get API Key**:
+   - In "Credentials", create an API Key
+   - Restrict it to Google Drive API and Google Sheets API (optional but recommended)
+
+4. **Configure Environment Variables**:
+   Create a `.env` file in the project root:
+   ```
+   VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   VITE_GOOGLE_API_KEY=your-api-key
+   ```
+
+5. **Connect in App**:
+   - Click the three-dot menu (⋮) in the top bar
+   - Select "Connect to GDrive"
+   - Authorize the app when prompted
+
+### How It Works
+
+- **Google Sheets**: Project table data (shots, scenes, script text, notes) syncs to a Google Sheet named "{Project Title} - Storyboard"
+- **Google Drive Folders**: Images are organized in folders:
+  - Main folder: "{Project Title} - Images"
+  - Scene folders: "Scene {Number}: {Title}"
+  - Images are named: "shot-{Code}-frame-{Index}.png"
+
+The "Saved" time in the menu reflects the last Google Drive sync time when connected, otherwise it shows the local save time.
 
 ## License
 

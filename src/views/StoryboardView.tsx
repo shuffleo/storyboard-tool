@@ -13,6 +13,8 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   const addFrame = useStore((state) => state.addFrame);
   const createShot = useStore((state) => state.createShot);
   const createScene = useStore((state) => state.createScene);
+  const deleteShot = useStore((state) => state.deleteShot);
+  const bulkUpdateShots = useStore((state) => state.bulkUpdateShots);
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const [density, setDensity] = useState<'compact' | 'detailed'>('detailed');
   const [selectedShots, setSelectedShots] = useState<Set<string>>(new Set());
@@ -50,7 +52,10 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   const getSceneName = (sceneId?: string) => {
     if (!sceneId) return null;
     const scene = scenes.find((s) => s.id === sceneId);
-    return scene ? `Scene ${scene.sceneNumber}` : null;
+    if (!scene) return null;
+    // Use the same format as TableView: "sceneNumber: title" or just "sceneNumber" if no title
+    const title = scene.title && scene.title.trim() ? scene.title : `Scene ${scene.sceneNumber}`;
+    return `${scene.sceneNumber}: ${title}`;
   };
 
   /**
@@ -126,6 +131,36 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
       onSelect(shotId, 'shot');
     }
   };
+
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Deselect if clicking on empty area (not on a card)
+    if ((e.target as HTMLElement).closest('[data-card]')) return;
+    setSelectedShots(new Set());
+    setFocusedIndex(null);
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedShots.size === 0) return;
+    if (confirm(`Delete ${selectedShots.size} selected shot(s)?`)) {
+      selectedShots.forEach((id) => deleteShot(id, false)); // Don't ask about scene deletion for batch
+      setSelectedShots(new Set());
+    }
+  };
+
+  const handleBatchSceneChange = (sceneId: string) => {
+    if (selectedShots.size === 0) return;
+    bulkUpdateShots(Array.from(selectedShots), { sceneId: sceneId || undefined });
+    setSelectedShots(new Set());
+  };
+
+  // Sort scenes for dropdown
+  const sortedScenes = useMemo(() => {
+    return [...scenes].sort((a, b) => {
+      const numA = parseInt(a.sceneNumber, 10) || 0;
+      const numB = parseInt(b.sceneNumber, 10) || 0;
+      return numA - numB;
+    });
+  }, [scenes]);
 
   const handleMoveSelected = (direction: 'up' | 'down') => {
     if (focusedIndex === null || selectedShots.size === 0) return;
@@ -219,37 +254,88 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
 
   return (
     <div className="w-full h-full flex flex-col bg-gray-50">
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white">
-        <div className="flex items-center gap-4">
+      <div className="p-2 sm:p-4 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 bg-white">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
           <button
             onClick={() => createShot()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs sm:text-sm font-medium"
           >
             + Add Shot
           </button>
           <button
             onClick={() => createScene()}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm font-medium"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-xs sm:text-sm font-medium"
           >
             + Add Scene
           </button>
+          {selectedShots.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs sm:text-sm text-gray-600">{selectedShots.size} selected</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleMoveSelected('up')}
+                  className="p-1 text-gray-400 hover:text-gray-600"
+                  title="Move up (Cmd/Ctrl+↑)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleMoveSelected('down')}
+                  className="p-1 text-gray-400 hover:text-gray-600"
+                  title="Move down (Cmd/Ctrl+↓)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+              <select
+                onChange={(e) => {
+                  if (e.target.value.startsWith('scene:')) {
+                    handleBatchSceneChange(e.target.value.split(':')[1]);
+                  }
+                  e.target.value = '';
+                }}
+                className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-xs sm:text-sm"
+                defaultValue=""
+              >
+                <option value="">Move to scene...</option>
+                <option value="scene:">Unassigned</option>
+                {sortedScenes.map((s) => (
+                  <option key={s.id} value={`scene:${s.id}`}>
+                    {s.sceneNumber}: {s.title || `Scene ${s.sceneNumber}`}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleBatchDelete}
+                className="px-2 sm:px-3 py-1 text-red-600 hover:bg-red-50 rounded text-xs sm:text-sm border border-red-300 hover:border-red-400 flex items-center gap-1"
+                title="Delete selected"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span className="hidden sm:inline">Delete</span>
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
           <button
             onClick={() => setLayout(layout === 'grid' ? 'list' : 'grid')}
-            className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100"
+            className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-xs sm:text-sm hover:bg-gray-100"
           >
             {layout === 'grid' ? 'List' : 'Grid'}
           </button>
           <button
             onClick={() => setDensity(density === 'compact' ? 'detailed' : 'compact')}
-            className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100"
+            className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-xs sm:text-sm hover:bg-gray-100"
           >
-            {density === 'compact' ? 'Detailed' : 'Compact'}
+            {density === 'compact' ? 'Compact' : 'Detailed'}
           </button>
-          {selectedShots.size > 0 && (
-            <span className="text-sm text-gray-600">{selectedShots.size} selected</span>
-          )}
         </div>
-        <div className="text-sm text-gray-600">{sortedShots.length} shots</div>
       </div>
 
       <input
@@ -268,11 +354,12 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
 
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto p-4 focus:outline-none"
+        className="flex-1 overflow-auto p-2 sm:p-4 focus:outline-none"
         tabIndex={0}
+        onClick={handleContainerClick}
       >
         <div
-          className={layout === 'grid' ? 'grid grid-cols-3 gap-4' : 'flex flex-col gap-4'}
+          className={layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4' : 'flex flex-col gap-2 sm:gap-4'}
         >
           {sortedShots.map((shot, index) => {
             const shotFrames = getShotFrames(shot.id);
@@ -285,12 +372,13 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
             return (
               <div
                 key={shot.id}
+                data-card
                 className={`bg-white rounded-lg border-2 ${
                   isSelected
                     ? 'border-blue-400 shadow-md'
                     : 'border-gray-200'
                 } ${isFocused ? 'ring-2 ring-blue-300' : ''} ${
-                  density === 'compact' ? 'p-2' : 'p-4'
+                  density === 'compact' ? 'p-2' : 'p-2 sm:p-4'
                 } transition-all`}
                 onClick={(e) => handleCardClick(e, shot.id, index)}
               >

@@ -16,14 +16,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
   /* Force light mode - prevent system dark mode from affecting UI */
-  background-color: #f9fafb;
-  color: #111827;
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+}
+
+/* Force light mode - disable dark mode completely */
+html, body, #root {
+  color-scheme: light !important;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
-  background-color: #f9fafb;
-  color: #111827;
+  background-color: #f9fafb !important;
+  color: #111827 !important;
 }
 

@@ -121,6 +121,12 @@ reorderShots(newOrder);
 
 ### Text Field Editing
 
+#### Auto-Resizing Textareas
+- Script and General Notes fields use `AutoResizeTextarea` component
+- Automatically grows to fit content (minimum 4rem height)
+- Resizes in real-time as user types
+- Prevents text field from shrinking when clicked
+
 #### Keyboard Shortcuts (CRITICAL - DO NOT BREAK)
 All text fields MUST allow standard shortcuts:
 - Cmd/Ctrl+A: Select all
@@ -142,7 +148,8 @@ onKeyDown={(e) => {
 
 #### Where This Applies
 - Shot code input
-- Script textarea
+- Script textarea (auto-resizing)
+- General Notes textarea (auto-resizing)
 - Scene name input
 - Any editable text field
 
@@ -176,17 +183,38 @@ onKeyDown={(e) => {
 - Delete (trash icon button)
 - Keyboard: Cmd/Ctrl+Arrow Up/Down to move selected shots
 
+### Delete Shot/Scene Dialog
+
+#### Last Shot Deletion
+- When deleting the last shot in a scene, a modal dialog appears with 3 options:
+  - "Delete row only" - Deletes only the shot
+  - "Delete row and scene" - Deletes both the shot and the scene
+  - "Cancel" - Cancels the deletion
+- For non-last shots, a simple confirmation dialog appears
+- Implemented in `TableView.tsx` with `deleteDialog` state
+- Store's `deleteShot` function simplified to only handle deletion (no dialogs)
+
 ### Scene Management
+
+#### Default Project Initialization
+- New projects start with 3 scenes, each with 5 shots
+- No project should start empty
+- Located in `init` function in `useStore.ts`
 
 #### Scene 0
 - All new shots are assigned to Scene 0 by default
 - Scene 0 is auto-created if it doesn't exist
 - Located in `createShot` function in `useStore.ts`
 
+#### Scene Creation
+- When creating a new scene, at least one shot is automatically created for it
+- Located in `createScene` function in `useStore.ts`
+
 #### Scene Editing
 - Scene names are editable inline in grouped view
 - Click scene header to edit
 - "+ Add Row" button in each scene section adds shots to that scene
+- Scene header row spans edge-to-edge (no white gap for actions column)
 
 #### Sorting
 - **CRITICAL**: Scenes are sorted by `sceneNumber` (as number, low to high)
@@ -198,7 +226,8 @@ onKeyDown={(e) => {
 ### Compact Mode (TableView)
 
 #### Features
-- Toggle in top bar
+- Text button toggle in top bar (matches StoryboardView style)
+- Shows "Compact" when in detailed mode, "Detailed" when in compact mode
 - Hides: checkbox column, arrow buttons column, actions column
 - Reduces row heights and padding
 - Maintains all editing functionality
@@ -217,6 +246,15 @@ onKeyDown={(e) => {
 - Script Text
 - Tags
 - General Notes
+
+### Undo/Redo System
+
+#### History Management
+- Supports up to 50 actions in history
+- `pushHistory()` is called before state changes
+- `undo()` and `redo()` restore previous states without saving
+- `canUndo` and `canRedo` flags track available actions
+- Fixed: `redo` now correctly calculates `canRedo` based on history position
 
 ## Common Refactoring Mistakes to Avoid
 
@@ -300,6 +338,12 @@ After any refactoring, verify:
 - [ ] ZIP import works and restores images
 - [ ] Import confirmation dialog appears (Replace vs Add)
 - [ ] Dark mode doesn't break UI (forced light mode styling)
+- [ ] Textareas auto-resize to fit content (Script and General Notes)
+- [ ] Delete last shot shows 3-option dialog (Delete row only / Delete row and scene / Cancel)
+- [ ] Compact mode toggle is a text button (not checkbox)
+- [ ] Undo/Redo works correctly for all actions
+- [ ] New projects start with 3 scenes and 5 shots each
+- [ ] New scenes automatically get at least one shot
 
 ## File Structure
 
@@ -364,4 +408,11 @@ src/
 - ZIP export/import with images supported
 - Dark mode styling forced to light mode to prevent UI issues
 - Image count overlay improved (removed "Replace" text, better visibility)
+- Auto-resizing textareas for Script and General Notes fields
+- Delete shot/scene dialog with 3 options for last shot in scene
+- Compact mode toggle changed from checkbox to text button (matches StoryboardView)
+- Undo/Redo system fixed to correctly track history
+- Default project initialization: 3 scenes with 5 shots each
+- New scenes automatically create at least one shot
+- Google Drive integration support (requires API credentials setup)
 
