@@ -39,8 +39,16 @@ export function AnimaticsView({ onSelect }: AnimaticsViewProps) {
   const [resizeStartDuration, setResizeStartDuration] = useState(0);
   const [resizeStartTime, setResizeStartTime] = useState(0);
   
-  // Timeline zoom
-  const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%, higher = more zoomed in
+  // Timeline zoom - default 500%, min 50%, max 1000%
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    const saved = localStorage.getItem('animaticsZoomLevel');
+    return saved ? parseFloat(saved) : 5; // Default 500%
+  });
+  
+  // Persist zoom level changes
+  useEffect(() => {
+    localStorage.setItem('animaticsZoomLevel', String(zoomLevel));
+  }, [zoomLevel]);
   
   const videoRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -824,7 +832,7 @@ export function AnimaticsView({ onSelect }: AnimaticsViewProps) {
             </button>
             <span className="text-xs text-slate-400 min-w-[3rem] text-center">{Math.round(zoomLevel * 100)}%</span>
             <button
-              onClick={() => setZoomLevel(Math.min(5, zoomLevel + 0.5))}
+              onClick={() => setZoomLevel(Math.min(10, zoomLevel + 0.5))}
               className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded text-sm"
               title="Zoom in"
             >

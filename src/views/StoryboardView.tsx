@@ -14,8 +14,25 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   const addFrame = useStore((state) => state.addFrame);
   const deleteShot = useStore((state) => state.deleteShot);
   const bulkUpdateShots = useStore((state) => state.bulkUpdateShots);
-  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
-  const [density, setDensity] = useState<'compact' | 'detailed'>('detailed');
+  // Persistent layout and density preferences
+  const [layout, setLayout] = useState<'grid' | 'list'>(() => {
+    const saved = localStorage.getItem('storyboardLayout');
+    return (saved === 'grid' || saved === 'list') ? saved : 'grid';
+  });
+  const [density, setDensity] = useState<'compact' | 'detailed'>(() => {
+    const saved = localStorage.getItem('storyboardDensity');
+    return (saved === 'compact' || saved === 'detailed') ? saved : 'detailed';
+  });
+  
+  // Persist layout changes
+  useEffect(() => {
+    localStorage.setItem('storyboardLayout', layout);
+  }, [layout]);
+  
+  // Persist density changes
+  useEffect(() => {
+    localStorage.setItem('storyboardDensity', density);
+  }, [density]);
   const [selectedShots, setSelectedShots] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState<Map<string, number>>(new Map());
