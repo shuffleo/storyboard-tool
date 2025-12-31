@@ -30,7 +30,7 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
   const calculateTimecode = (index: number) => {
     let total = 0;
     for (let i = 0; i < index; i++) {
-      total += sortedShots[i]?.durationTarget || 0;
+      total += (sortedShots[i]?.duration || 1000) / 1000; // Convert ms to seconds
     }
     const hours = Math.floor(total / 3600);
     const minutes = Math.floor((total % 3600) / 60);
@@ -39,7 +39,7 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
   };
 
   const totalDuration = useMemo(() => {
-    return sortedShots.reduce((sum, shot) => sum + shot.durationTarget, 0);
+    return sortedShots.reduce((sum, shot) => sum + (shot.duration || 1000) / 1000, 0); // Convert ms to seconds
   }, [sortedShots]);
 
   const formatDuration = (seconds: number) => {
@@ -58,10 +58,10 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
   });
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-50">
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white">
+    <div className="w-full h-full flex flex-col bg-slate-900">
+      <div className="p-4 border-b border-slate-700 flex items-center justify-between bg-slate-800">
         <div className="flex items-center gap-4">
-          <label className="text-sm text-gray-600">
+          <label className="text-sm text-slate-300">
             Scale:
             <input
               type="range"
@@ -74,7 +74,7 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
             {pixelsPerSecond}px/s
           </label>
         </div>
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-slate-300">
           Total Duration: {formatDuration(totalDuration)} ({totalDuration.toFixed(1)}s)
         </div>
       </div>
@@ -82,11 +82,11 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
       <div className="flex-1 overflow-auto">
         <div className="relative" style={{ minWidth: `${totalDuration * pixelsPerSecond}px` }}>
           {/* Timecode ruler */}
-          <div className="sticky top-0 bg-white border-b border-gray-200 z-20 h-8 flex items-center">
+          <div className="sticky top-0 bg-slate-800 border-b border-slate-700 z-20 h-8 flex items-center">
             {Array.from({ length: Math.ceil(totalDuration) + 1 }).map((_, i) => (
               <div
                 key={i}
-                className="absolute border-l border-gray-300 text-xs text-gray-500 pl-1"
+                className="absolute border-l border-slate-600 text-xs text-slate-400 pl-1"
                 style={{ left: `${i * pixelsPerSecond}px` }}
               >
                 {i}s
@@ -104,20 +104,20 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
                   return;
                 }
                 if (sortedShots.indexOf(shot) < sortedShots.indexOf(sceneShots[0])) {
-                  sceneStartTime += shot.durationTarget;
+                  sceneStartTime += (shot.duration || 1000) / 1000; // Convert ms to seconds
                 }
               });
 
               return (
                 <div key={sceneId || 'unassigned'} className="mb-4">
                   {sceneName && (
-                    <div className="text-sm font-semibold text-gray-700 mb-2 px-2">{sceneName}</div>
+                    <div className="text-sm font-semibold text-slate-200 mb-2 px-2">{sceneName}</div>
                   )}
                   <div className="flex gap-1">
                     {sceneShots.map((shot) => {
-                      const shotWidth = shot.durationTarget * pixelsPerSecond;
+                      const shotWidth = ((shot.duration || 1000) / 1000) * pixelsPerSecond; // Convert ms to seconds
                       const shotFrames = getShotFrames(shot.id);
-                      currentTime += shot.durationTarget;
+                      currentTime += (shot.duration || 1000) / 1000; // Convert ms to seconds
 
                       return (
                         <div
@@ -131,12 +131,12 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
                           <div
                             className={`h-24 border-2 rounded ${
                               shot.status === 'todo'
-                                ? 'border-gray-300 bg-gray-50'
+                                ? 'border-slate-600 bg-slate-800'
                                 : shot.status === 'boarded'
                                 ? 'border-yellow-400 bg-yellow-50'
                                 : shot.status === 'animated'
                                 ? 'border-green-400 bg-green-50'
-                                : 'border-red-400 bg-red-50'
+                                : 'border-red-600 bg-red-900/30'
                             } cursor-pointer hover:shadow-md transition-shadow flex flex-col`}
                             onClick={() => onSelect(shot.id, 'shot')}
                           >
@@ -147,18 +147,18 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
                                 className="w-full h-16 object-cover rounded-t"
                               />
                             ) : (
-                              <div className="w-full h-16 bg-gray-100 flex items-center justify-center text-xs text-gray-400">
+                              <div className="w-full h-16 bg-slate-700 flex items-center justify-center text-xs text-slate-400">
                                 No image
                               </div>
                             )}
                             <div className="p-1 flex items-center justify-between">
-                              <span className="text-xs font-semibold text-gray-900">{shot.shotCode}</span>
-                              <span className="text-xs text-gray-600">{shot.durationTarget.toFixed(1)}s</span>
+                              <span className="text-xs font-semibold text-slate-100">{shot.shotCode}</span>
+                              <span className="text-xs text-slate-300">{((shot.duration || 1000) / 1000).toFixed(1)}s</span>
                             </div>
                           </div>
                           {/* Duration resize handle */}
                           <div
-                            className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
                             onMouseDown={(e) => {
                               e.stopPropagation();
                               const startX = e.clientX;
@@ -168,7 +168,7 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
                                 const deltaX = moveEvent.clientX - startX;
                                 const newWidth = Math.max(40, startWidth + deltaX);
                                 const newDuration = newWidth / pixelsPerSecond;
-                                updateShot(shot.id, { durationTarget: newDuration });
+                                updateShot(shot.id, { duration: Math.max(300, newDuration * 1000) }); // Convert seconds to ms, min 300ms
                               };
 
                               const handleMouseUp = () => {
@@ -190,14 +190,14 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
           </div>
 
           {/* Timecode markers */}
-          <div className="sticky bottom-0 bg-white border-t border-gray-200 h-8 flex items-center">
+          <div className="sticky bottom-0 bg-slate-800 border-t border-slate-700 h-8 flex items-center">
             {sortedShots.map((shot, index) => {
               const timecode = calculateTimecode(index);
-              const time = sortedShots.slice(0, index).reduce((sum, s) => sum + s.durationTarget, 0);
+              const time = sortedShots.slice(0, index).reduce((sum, s) => sum + (s.duration || 1000) / 1000, 0); // Convert ms to seconds
               return (
                 <div
                   key={shot.id}
-                  className="absolute text-xs text-gray-500"
+                  className="absolute text-xs text-slate-400"
                   style={{ left: `${time * pixelsPerSecond}px` }}
                 >
                   {timecode}

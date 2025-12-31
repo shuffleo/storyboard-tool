@@ -57,6 +57,9 @@ interface Store extends ProjectState {
   connectGoogleDrive: () => Promise<void>;
   disconnectGoogleDrive: () => Promise<void>;
   syncToGoogleDrive: () => Promise<void>;
+  
+  // Clear all content
+  clearAllContent: () => Promise<void>;
 }
 
 const defaultProject: Project = {
@@ -71,7 +74,7 @@ const defaultProject: Project = {
   updatedAt: Date.now(),
 };
 
-const MAX_HISTORY = 50;
+const MAX_HISTORY = 100;
 
 export const useStore = create<Store>((set, get) => ({
   project: defaultProject,
@@ -127,7 +130,7 @@ export const useStore = create<Store>((set, get) => ({
               orderIndex: sceneNum * 5 + shotNum,
               shotCode,
               scriptText: '',
-              durationTarget: 0,
+              duration: 1000, // Default 1 second (1000ms)
               status: 'todo',
               tags: [],
               cameraNotes: '',
@@ -362,6 +365,7 @@ export const useStore = create<Store>((set, get) => ({
     
     const id = nanoid();
     const maxOrder = Math.max(-1, ...state.shots.map(s => s.orderIndex));
+    // Shot codes: 010, 020, 030... (orderIndex * 10)
     const shotCode = String((maxOrder + 1) * 10).padStart(3, '0');
     const shot: Shot = {
       id,
@@ -369,7 +373,7 @@ export const useStore = create<Store>((set, get) => ({
       orderIndex: maxOrder + 1,
       shotCode,
       scriptText: '',
-      durationTarget: 0,
+      duration: 1000, // Default 1 second (1000ms)
       status: 'todo',
       tags: [],
       cameraNotes: '',
@@ -446,11 +450,11 @@ export const useStore = create<Store>((set, get) => ({
       id: newId,
       orderIndex: shot.orderIndex + 1,
       shotCode: String((shot.orderIndex + 1) * 10).padStart(3, '0'),
-      scriptText: shot.scriptText.slice(atIndex),
+      scriptText: shot.scriptText.slice(atIndex), // Second half of text
     };
     
     set((state) => {
-      const updatedShot = { ...shot, scriptText: shot.scriptText.slice(0, atIndex) };
+      const updatedShot = { ...shot, scriptText: shot.scriptText.slice(0, atIndex) }; // First half
       const updatedShots = state.shots.map(s => s.id === shotId ? updatedShot : s);
       const insertIndex = updatedShots.findIndex(s => s.id === shotId) + 1;
       updatedShots.splice(insertIndex, 0, newShot);
@@ -473,10 +477,11 @@ export const useStore = create<Store>((set, get) => ({
     const shots = get().shots.filter(s => shotIds.includes(s.id)).sort((a, b) => a.orderIndex - b.orderIndex);
     if (shots.length < 2) return '';
     
+    // Merge: combine text fields, sum duration, dedupe tags
     const merged: Shot = {
       ...shots[0],
       scriptText: shots.map(s => s.scriptText).join('\n\n'),
-      durationTarget: shots.reduce((sum, s) => sum + s.durationTarget, 0),
+      duration: shots.reduce((sum, s) => sum + s.duration, 0),
       tags: [...new Set(shots.flatMap(s => s.tags))],
       cameraNotes: shots.map(s => s.cameraNotes).filter(Boolean).join('\n\n'),
       animationNotes: shots.map(s => s.animationNotes).filter(Boolean).join('\n\n'),
@@ -484,7 +489,7 @@ export const useStore = create<Store>((set, get) => ({
     };
     
     set((state) => {
-      const remainingIds = shotIds.slice(1);
+      const remainingIds = shotIds.slice(1); // Keep first shot, remove others
       const updatedShots = state.shots
         .filter(s => !remainingIds.includes(s.id))
         .map(s => s.id === shots[0].id ? merged : s);
@@ -638,6 +643,65 @@ export const useStore = create<Store>((set, get) => ({
       set({ isGoogleSyncing: false });
       alert('Failed to sync to Google Drive. Please try again.');
     }
+  },
+
+  clearAllContent: async () => {
+    // Create default project with 3 scenes and 5 shots each
+    const defaultScenes: Scene[] = [];
+    const defaultShots: Shot[] = [];
+    
+    for (let sceneNum = 0; sceneNum < 3; sceneNum++) {
+      const sceneId = nanoid();
+      const scene: Scene = {
+        id: sceneId,
+        sequenceId: undefined,
+        sceneNumber: String(sceneNum),
+        title: `Scene ${sceneNum}`,
+        summary: '',
+        orderIndex: sceneNum,
+        notes: '',
+      };
+      defaultScenes.push(scene);
+      
+      for (let shotNum = 0; shotNum < 5; shotNum++) {
+        const shotId = nanoid();
+        const shotCode = String((sceneNum * 5 + shotNum) * 10).padStart(3, '0');
+        const shot: Shot = {
+          id: shotId,
+          sceneId: sceneId,
+          orderIndex: sceneNum * 5 + shotNum,
+          shotCode,
+          scriptText: '',
+          duration: 1000,
+          status: 'todo',
+          tags: [],
+          cameraNotes: '',
+          animationNotes: '',
+          generalNotes: '',
+        };
+        defaultShots.push(shot);
+      }
+    }
+    
+    const newProject: Project = {
+      ...defaultProject,
+      id: nanoid(),
+      title: 'Untitled Project',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    
+    const state: ProjectState = {
+      project: newProject,
+      sequences: [],
+      scenes: defaultScenes,
+      shots: defaultShots,
+      frames: [],
+      versions: [],
+    };
+    
+    set({ ...state, history: [state], historyIndex: 0, canUndo: false, canRedo: false });
+    await db.saveProject(state);
   },
 
   loadProjectState: (state: ProjectState) => {

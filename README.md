@@ -5,12 +5,16 @@ A **local-first, lightweight web application** for managing and iterating on ani
 ## Features
 
 - **Single Source of Truth**: Edit once, see everywhere - all views are strictly synchronized
-- **Two Synchronized Views**:
+- **Three Synchronized Views**:
   - **Table View**: Spreadsheet-like editing with inline editing, scene grouping, compact mode, and bulk operations
-  - **Storyboard View**: Card-based layout with multi-select, keyboard navigation, and image carousel
+  - **Storyboard View**: Card-based layout with multi-select, keyboard navigation, and image carousel (4 columns in compact mode)
+  - **Animatics View**: Timeline-based playback with video player, Inspector panel, keyboard shortcuts, zoom controls, and frame editing
+- **Shot Duration**: Each shot has a duration field (milliseconds, minimum 300ms) for animatics playback
+- **Dark Theme**: Modern dark UI throughout the application
 - **Local-First**: All data stored in IndexedDB, works fully offline
 - **Auto-save**: Continuous autosave on every change
 - **Import/Export**: JSON, CSV, ZIP (with images), PDF, and image import support
+- **Google Drive Integration**: Optional Google Drive sync for cloud backup
 - **No Backend**: Runs entirely in the browser, perfect for GitHub Pages or local use
 
 ## Tech Stack
@@ -71,8 +75,10 @@ When you first open the app, a default project is created with 3 scenes, each co
 ### Reordering Shots
 
 - **Table View**: Use arrow buttons or multi-select with Cmd/Ctrl+Arrow keys
-- **Storyboard View**: Use arrow buttons or multi-select with Cmd/Ctrl+Arrow keys
+- **Storyboard View**: Drag and drop cards to reorder (cards from other scenes are dimmed), or use arrow buttons/multi-select with Cmd/Ctrl+Arrow keys
+- **Animatics View**: Drag shots on timeline to reorder (shots from other scenes are dimmed)
 - Shots are automatically sorted by scene (low to high) and within each scene by order (low to high)
+- When dragging, shots from other scenes are dimmed to indicate you can only reorder within the same scene
 
 ### Views
 
@@ -89,6 +95,8 @@ When you first open the app, a default project is created with 3 scenes, each co
   - **JSON**: Full backup (no images)
   - **CSV**: Shot list only
   - **PDF**: Storyboard sheets
+  - **MP4** (Animatics view only): Export animatics as video
+- **Delete All Content**: Available in three-dot menu with confirmation dialog. Options: Delete All Content, Export and Delete All Content, Cancel
 
 ## Data Model
 
@@ -106,6 +114,8 @@ All data is stored locally in IndexedDB. The canonical data structure includes:
 - **Cmd/Ctrl+Shift+Z** or **Cmd/Ctrl+Y**: Redo
 - **Cmd/Ctrl+Arrow Up/Down**: Move selected shots up/down (in both views)
 - **Arrow Up/Down**: Navigate between shots (Storyboard view)
+- **Arrow Left/Right**: Navigate to previous/next frame (Animatics view)
+- **Spacebar**: Play/pause (Animatics view, when not typing)
 - **Cmd/Ctrl+Click**: Multi-select shots (Storyboard view)
 - **Shift+Click**: Range select shots (Storyboard view)
 
@@ -127,6 +137,31 @@ All data is stored locally in IndexedDB. The canonical data structure includes:
 - Toggle between Compact and Detailed views in Table view
 - Text button toggle (matches StoryboardView style)
 - Hides checkbox, arrow buttons, and actions columns in compact mode
+- Actions column heading is hidden (column exists but heading is empty)
+
+### Inspector Panel
+- **Shot Code**: Editable in header next to "Shot" label (removed from body)
+- **Image Carousel**: Shows all images for a shot with navigation, delete, and "Set as main" functionality
+- **Close Button**: Hidden in Animatics view, visible in Table and Storyboard views
+- **Padding**: Proper spacing between close button and shot code field
+- **Scene Dropdown**: 4px margin on dropdown arrow for better spacing
+
+### Debug Mode
+- Toggle Debug Mode from the three-dot menu in the top bar
+- When enabled, a debug panel appears at the bottom of the screen
+- Shows verbose logs with timestamps, categories, and error details
+- Always visible (rendered via React Portal) even if the main app crashes
+- Auto-scroll option and clear logs button available
+
+### Animatics View
+- **Timeline Zoom**: Zoom in/out controls (50%-500%) with synchronized time ruler and timeline
+- **Duration Editing**: Drag handles at shot edges to adjust duration (hover to show)
+- **Shot Reordering**: Drag shots on timeline to reorder (within same scene)
+- **Image Error Handling**: Corrupted images show error message with option to upload new image
+- **Video Restart**: Clicking play at the end restarts from beginning
+- **Keyboard Shortcuts**: Spacebar to play/pause, arrow keys to navigate frames
+- **Scrollbar Sync**: Time ruler and timeline share synchronized scrolling (only one visible scrollbar)
+- **Click Safety**: All click handlers validated to prevent blank screen crashes
 
 ## Performance
 

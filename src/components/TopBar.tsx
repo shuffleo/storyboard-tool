@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { ViewType } from '../App';
 import { useStore } from '../store/useStore';
-import { exportToJSON, exportToCSV, exportStoryboardPDF, exportToZIP, downloadFile, importFromJSON, importFromCSV, importFromZIP, importImages } from '../utils/importExport';
+import { exportToJSON, exportToCSV, exportStoryboardPDF, exportToZIP, exportAnimaticsToMP4, downloadFile, importFromJSON, importFromCSV, importFromZIP, importImages } from '../utils/importExport';
+import { debugLogger } from '../utils/debug';
 
 interface TopBarProps {
   currentView: ViewType;
@@ -27,7 +28,10 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
+  const [debugMode, setDebugMode] = useState(debugLogger.isEnabled());
   const menuRef = useRef<HTMLDivElement>(null);
+  const clearAllContent = useStore((state) => state.clearAllContent);
 
   const formatLastSaved = () => {
     // Use Google sync time if connected and synced, otherwise use local save time
@@ -67,6 +71,17 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
     await exportToZIP();
     setExportModalOpen(false);
     setMenuOpen(false);
+  };
+
+  const handleExportMP4 = async () => {
+    if (!project) return;
+    try {
+      await exportAnimaticsToMP4();
+      setExportModalOpen(false);
+      setMenuOpen(false);
+    } catch (error) {
+      alert(`Failed to export MP4: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const handleImportJSON = async () => {
@@ -204,6 +219,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
       if (!target.closest('.modal-content') && !target.closest('[data-modal-trigger]')) {
         setImportModalOpen(false);
         setExportModalOpen(false);
+        setDeleteAllModalOpen(false);
       }
     };
 
@@ -217,7 +233,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
   }, [importModalOpen, exportModalOpen]);
 
   return (
-    <div className="h-auto sm:h-12 bg-white border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between px-2 sm:px-4 py-2 sm:py-0 shadow-sm gap-2 sm:gap-0">
+    <div className="h-auto sm:h-12 bg-slate-800 border-b border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between px-2 sm:px-4 py-2 sm:py-0 shadow-sm gap-2 sm:gap-0">
       <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
         {isEditingTitle ? (
           <input
@@ -226,12 +242,12 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
             onChange={(e) => setTitleValue(e.target.value)}
             onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
-            className="text-lg font-semibold text-gray-900 bg-transparent border-b-2 border-blue-500 focus:outline-none"
+            className="text-lg font-semibold text-slate-100 bg-transparent border-b-2 border-slate-500 focus:outline-none"
             autoFocus
           />
         ) : (
           <h1
-            className="text-lg font-semibold text-gray-900 cursor-text hover:text-blue-600"
+            className="text-lg font-semibold text-slate-100 cursor-text hover:text-slate-300"
             onClick={() => setIsEditingTitle(true)}
           >
             {project?.title || 'Untitled Project'}
@@ -242,8 +258,8 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
             onClick={() => onViewChange('table')}
             className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
               currentView === 'table'
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-slate-600 text-white'
+                : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
             Table
@@ -252,11 +268,21 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
             onClick={() => onViewChange('storyboard')}
             className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
               currentView === 'storyboard'
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-slate-600 text-white'
+                : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
             Storyboard
+          </button>
+          <button
+            onClick={() => onViewChange('animatics')}
+            className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
+              currentView === 'animatics'
+                ? 'bg-slate-600 text-white'
+                : 'text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            Animatics
           </button>
         </div>
       </div>
@@ -265,7 +291,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
           <button
             onClick={undo}
             disabled={!canUndo}
-            className={`p-1.5 sm:p-2 rounded ${canUndo ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'}`}
+            className={`p-1.5 sm:p-2 rounded ${canUndo ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'}`}
             title="Undo (Cmd+Z)"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -275,7 +301,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
           <button
             onClick={redo}
             disabled={!canRedo}
-            className={`p-1.5 sm:p-2 rounded ${canRedo ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'}`}
+            className={`p-1.5 sm:p-2 rounded ${canRedo ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'}`}
             title="Redo (Cmd+Shift+Z)"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -286,7 +312,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-1.5 sm:p-2 text-gray-600 hover:bg-gray-100 rounded"
+            className="p-1.5 sm:p-2 text-slate-300 hover:bg-slate-700 rounded"
             title="Menu"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -294,14 +320,14 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
             </svg>
           </button>
           {menuOpen && (
-            <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded shadow-lg z-50">
+            <div className="absolute right-0 mt-1 w-48 bg-slate-800 border border-slate-700 rounded shadow-lg z-50">
               <div className="py-1">
                 <button
                   onClick={() => {
                     setMenuOpen(false);
                     setImportModalOpen(true);
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
                   data-modal-trigger
                 >
                   Import
@@ -311,7 +337,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                     setMenuOpen(false);
                     setExportModalOpen(true);
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
                   data-modal-trigger
                 >
                   Export
@@ -319,14 +345,35 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                 <button
                   onClick={handleGoogleDriveToggle}
                   disabled={isGoogleSyncing}
-                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                  className={`block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 ${
                     isGoogleSyncing ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
                   {isGoogleDriveConnected ? 'Disconnect from GDrive' : 'Connect to GDrive'}
-                  {isGoogleSyncing && <span className="ml-2 text-xs text-gray-500">(Syncing...)</span>}
+                  {isGoogleSyncing && <span className="ml-2 text-xs text-slate-400">(Syncing...)</span>}
                 </button>
-                <div className="px-4 py-2 text-xs sm:text-sm text-gray-500 border-t border-gray-100 mt-1">
+                <button
+                  onClick={() => {
+                    const newState = !debugMode;
+                    setDebugMode(newState);
+                    debugLogger.setEnabled(newState);
+                    localStorage.setItem('debug-mode', String(newState));
+                    setMenuOpen(false);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                >
+                  {debugMode ? 'Disable Debug Mode' : 'Enable Debug Mode'}
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setDeleteAllModalOpen(true);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/30 border-t border-slate-700 mt-1"
+                >
+                  Delete All Content
+                </button>
+                <div className="px-4 py-2 text-xs sm:text-sm text-slate-400 border-t border-slate-700 mt-1">
                   {isSaving || isGoogleSyncing ? (
                     <span>Last save: Saving...</span>
                   ) : (
@@ -340,28 +387,28 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
           {/* Import Modal */}
           {importModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-80 modal-content">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Import</h3>
+              <div className="bg-slate-800 rounded-lg shadow-xl w-80 modal-content">
+                <div className="p-4 border-b border-slate-700">
+                  <h3 className="text-lg font-semibold text-slate-100">Import</h3>
                 </div>
                 <div className="p-2">
-                  <button onClick={handleImportJSON} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 rounded">
+                  <button onClick={handleImportJSON} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     JSON
                   </button>
-                  <button onClick={handleImportCSV} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 rounded">
+                  <button onClick={handleImportCSV} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     CSV
                   </button>
-                  <button onClick={handleImportImages} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 rounded">
+                  <button onClick={handleImportImages} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     Images
                   </button>
-                  <button onClick={handleImportZIP} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 rounded">
+                  <button onClick={handleImportZIP} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     ZIP
                   </button>
                 </div>
-                <div className="p-4 border-t border-gray-200">
+                <div className="p-4 border-t border-slate-700">
                   <button
                     onClick={() => setImportModalOpen(false)}
-                    className="w-full px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+                    className="w-full px-4 py-2 text-sm text-slate-200 bg-slate-700 hover:bg-slate-600 rounded"
                   >
                     Cancel
                   </button>
@@ -373,28 +420,80 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
           {/* Export Modal */}
           {exportModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-80 modal-content">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Export</h3>
+              <div className="bg-slate-800 rounded-lg shadow-xl w-80 modal-content">
+                <div className="p-4 border-b border-slate-700">
+                  <h3 className="text-lg font-semibold text-slate-100">Export</h3>
                 </div>
                 <div className="p-2">
-                  <button onClick={handleExportJSON} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 rounded">
+                  <button onClick={handleExportJSON} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     JSON
                   </button>
-                  <button onClick={handleExportCSV} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 rounded">
+                  <button onClick={handleExportCSV} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     CSV
                   </button>
-                  <button onClick={handleExportPDF} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 rounded">
+                  <button onClick={handleExportPDF} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     PDF Storyboard
                   </button>
-                  <button onClick={handleExportZIP} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 rounded">
+                  <button onClick={handleExportZIP} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     ZIP (with images)
                   </button>
+                  {currentView === 'animatics' && (
+                    <button onClick={handleExportMP4} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
+                      MP4 Video
+                    </button>
+                  )}
                 </div>
-                <div className="p-4 border-t border-gray-200">
+                <div className="p-4 border-t border-slate-700">
                   <button
                     onClick={() => setExportModalOpen(false)}
-                    className="w-full px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+                    className="w-full px-4 py-2 text-sm text-slate-200 bg-slate-700 hover:bg-slate-600 rounded"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete All Content Modal */}
+          {deleteAllModalOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-slate-800 rounded-lg shadow-xl w-96 modal-content">
+                <div className="p-4 border-b border-slate-700">
+                  <h3 className="text-lg font-semibold text-red-400">Delete All Content</h3>
+                </div>
+                <div className="p-4">
+                  <p className="text-sm text-slate-300 mb-4">
+                    This action is <strong className="text-red-400">irreversible</strong>. All scenes, shots, images, and data will be permanently deleted.
+                  </p>
+                  <p className="text-sm text-slate-400 mb-4">
+                    Would you like to export your project before deleting?
+                  </p>
+                </div>
+                <div className="p-4 border-t border-slate-700 flex flex-col gap-2">
+                  <button
+                    onClick={async () => {
+                      await clearAllContent();
+                      setDeleteAllModalOpen(false);
+                      setMenuOpen(false);
+                    }}
+                    className="w-full px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded"
+                  >
+                    Delete All Content
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setDeleteAllModalOpen(false);
+                      setMenuOpen(false);
+                      setExportModalOpen(true);
+                    }}
+                    className="w-full px-4 py-2 text-sm text-slate-200 bg-slate-700 hover:bg-slate-600 rounded"
+                  >
+                    Export and Delete All Content
+                  </button>
+                  <button
+                    onClick={() => setDeleteAllModalOpen(false)}
+                    className="w-full px-4 py-2 text-sm text-slate-200 bg-slate-700 hover:bg-slate-600 rounded"
                   >
                     Cancel
                   </button>

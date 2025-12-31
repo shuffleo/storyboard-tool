@@ -15,20 +15,30 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
-  /* Force light mode - prevent system dark mode from affecting UI */
-  background-color: #f9fafb !important;
-  color: #111827 !important;
+  /* Force dark mode - prevent system light mode from affecting UI */
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
 }
 
-/* Force light mode - disable dark mode completely */
+/* Force dark mode - disable light mode completely */
 html, body, #root {
-  color-scheme: light !important;
+  color-scheme: dark !important;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
-  background-color: #f9fafb !important;
-  color: #111827 !important;
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+/* Hide scrollbar for time ruler */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 

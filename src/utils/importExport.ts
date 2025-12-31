@@ -54,7 +54,7 @@ export async function exportToCSV(): Promise<string> {
         shot.shotCode,
         scene ? `Scene ${scene.sceneNumber}` : '',
         `"${shot.scriptText.replace(/"/g, '""')}"`,
-        shot.durationTarget.toString(),
+        (shot.duration / 1000).toString(), // Convert ms to seconds for CSV
         shot.status,
         shot.tags.join('; '),
       ];
@@ -99,6 +99,7 @@ export async function importFromCSV(csv: string, replace: boolean = true): Promi
   const shots = useStore.getState().shots.sort((a, b) => a.orderIndex - b.orderIndex);
   for (let index = 0; index < lines.length - 1; index++) {
     const line = lines[index + 1];
+    // Parse CSV: split by comma, trim, remove quotes
     const values = line.split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
     
     let shot: Shot | undefined = shots[index];
@@ -110,7 +111,7 @@ export async function importFromCSV(csv: string, replace: boolean = true): Promi
     }
     if (!shot) continue;
 
-    // Find scene by name if provided
+    // Match scene by number or title
     let sceneId: string | undefined = undefined;
     if (values[sceneIndex]) {
       const sceneMatch = scenes.find((s) => 
@@ -122,7 +123,7 @@ export async function importFromCSV(csv: string, replace: boolean = true): Promi
     updateShot(shot.id, {
       shotCode: values[shotCodeIndex] || shot.shotCode,
       scriptText: values[scriptIndex] || '',
-      durationTarget: parseFloat(values[durationIndex]) || 0,
+      duration: Math.max(300, (parseFloat(values[durationIndex]) || 1) * 1000), // Convert seconds to ms, min 300ms
       status: (values[statusIndex] as any) || 'todo',
       tags: values[tagsIndex] ? values[tagsIndex].split(';').map((t) => t.trim()) : [],
       sceneId,
@@ -181,7 +182,7 @@ export async function exportStoryboardPDF(): Promise<void> {
   let y = 35; // Start below scene header
   let imagesOnPage = 0;
 
-  // Helper function to get image dimensions from base64
+  // Get natural image dimensions to preserve aspect ratio in PDF
   const getImageDimensions = (base64Image: string): Promise<{ width: number; height: number }> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -224,10 +225,19 @@ export async function exportStoryboardPDF(): Promise<void> {
 
     const shotFrames = frames.filter((f) => f.shotId === shot.id).sort((a, b) => a.orderIndex - b.orderIndex);
 
-    // Shot code
+    // Shot code and duration
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'bold');
     pdf.text(`Shot ${shot.shotCode}`, margin, y);
+    // Add duration next to shot code
+    const durationSeconds = (shot.duration / 1000).toFixed(1);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+    const shotCodeWidth = pdf.getTextWidth(`Shot ${shot.shotCode}`);
+    pdf.text(`(${durationSeconds}s)`, margin + shotCodeWidth + 3, y);
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(10);
     y += 6;
 
     // Image on the left
@@ -352,6 +362,105 @@ function getExtensionFromMime(mime: string): string {
 }
 
 /**
+ * Exports animatics as MP4 video
+ * Creates a video from shots with their durations
+ */
+export async function exportAnimaticsToMP4(): Promise<void> {
+  const state = useStore.getState();
+  const project = state.project;
+  
+  if (!project) {
+    throw new Error('No project loaded');
+  }
+
+  // Sort shots by order
+  const sortedShots = [...state.shots].sort((a, b) => {
+    const sceneA = state.scenes.find(s => s.id === a.sceneId);
+    const sceneB = state.scenes.find(s => s.id === b.sceneId);
+    const sceneNumA = sceneA ? parseInt(sceneA.sceneNumber) : 999;
+    const sceneNumB = sceneB ? parseInt(sceneB.sceneNumber) : 999;
+    if (sceneNumA !== sceneNumB) return sceneNumA - sceneNumB;
+    return a.orderIndex - b.orderIndex;
+  });
+
+  // Create canvas for rendering
+  const canvas = document.createElement('canvas');
+  canvas.width = 1920; // Full HD width
+  canvas.height = 1080; // Full HD height
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Failed to create canvas context');
+  }
+
+  // Create video stream using MediaRecorder
+  const stream = canvas.captureStream(30); // 30 FPS
+  const mediaRecorder = new MediaRecorder(stream, {
+    mimeType: 'video/webm;codecs=vp9',
+  });
+
+  const chunks: Blob[] = [];
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) {
+      chunks.push(e.data);
+    }
+  };
+
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.title || 'animatics'}.webm`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  mediaRecorder.start();
+
+  // Render each shot
+  for (const shot of sortedShots) {
+    const shotFrames = state.frames
+      .filter(f => f.shotId === shot.id)
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+    
+    const frameImage = shotFrames[0]?.image;
+    if (frameImage) {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          // Clear canvas
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Draw image centered
+          const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+          const x = (canvas.width - img.width * scale) / 2;
+          const y = (canvas.height - img.height * scale) / 2;
+          ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+          
+          resolve();
+        };
+        img.onerror = reject;
+        img.src = frameImage;
+      });
+    } else {
+      // Draw placeholder
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#64748b';
+      ctx.font = '48px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(shot.shotCode, canvas.width / 2, canvas.height / 2);
+    }
+
+    // Wait for shot duration
+    await new Promise(resolve => setTimeout(resolve, shot.duration));
+  }
+
+  mediaRecorder.stop();
+}
+
+/**
  * Exports project data and all images to a ZIP file
  */
 export async function exportToZIP(): Promise<void> {
@@ -378,7 +487,7 @@ export async function exportToZIP(): Promise<void> {
   const imageMap = new Map<string, { counter: number; filename: string }>(); // Track image usage to avoid duplicates
   let imageCounter = 0;
 
-  // First pass: collect all unique images and generate filenames
+  // First pass: collect unique images (dedupe by base64 data)
   for (const frame of state.frames) {
     if (!frame.image) continue;
 
@@ -402,7 +511,7 @@ export async function exportToZIP(): Promise<void> {
     }
   }
 
-  // Create a mapping file that links frame IDs to image filenames
+  // Map frame IDs to image filenames for import restoration
   const imageMapping: Record<string, string> = {};
   state.frames.forEach(frame => {
     if (frame.image && imageMap.has(frame.image)) {

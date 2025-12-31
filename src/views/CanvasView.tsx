@@ -178,12 +178,12 @@ export function CanvasView({ onSelect }: CanvasViewProps) {
   }, [nodes]);
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-50">
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white">
+    <div className="w-full h-full flex flex-col bg-slate-900">
+      <div className="p-4 border-b border-slate-700 flex items-center justify-between bg-slate-800">
         <div className="flex items-center gap-4">
           <button
             onClick={handleAutoLayout}
-            className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100"
+            className="px-3 py-1 border border-slate-600 rounded text-sm hover:bg-slate-700 text-slate-200"
           >
             Auto Layout
           </button>
@@ -195,14 +195,14 @@ export function CanvasView({ onSelect }: CanvasViewProps) {
             />
             Snap to Grid
           </label>
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-slate-400">
             Zoom: {(zoom * 100).toFixed(0)}%
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={handleExportPNG}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            className="px-3 py-1 bg-slate-600 text-white rounded text-sm hover:bg-slate-700"
           >
             Export PNG
           </button>
@@ -246,8 +246,8 @@ export function CanvasView({ onSelect }: CanvasViewProps) {
             return (
               <div
                 key={node.shot.id}
-                className={`absolute bg-white border-2 rounded-lg shadow-md cursor-move ${
-                  isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
+                className={`absolute bg-slate-800 border-2 rounded-lg shadow-md cursor-move ${
+                  isSelected ? 'border-slate-400 ring-2 ring-slate-500' : 'border-slate-600'
                 }`}
                 style={{
                   left: `${node.x}px`,
@@ -268,16 +268,16 @@ export function CanvasView({ onSelect }: CanvasViewProps) {
                     className="w-full h-12 object-cover rounded-t-lg"
                   />
                 ) : (
-                  <div className="w-full h-12 bg-gray-100 flex items-center justify-center text-xs text-gray-400 rounded-t-lg">
+                  <div className="w-full h-12 bg-slate-700 flex items-center justify-center text-xs text-slate-400 rounded-t-lg">
                     No image
                   </div>
                 )}
                 <div className="p-2">
-                  <div className="text-xs font-semibold text-gray-900">{node.shot.shotCode}</div>
+                  <div className="text-xs font-semibold text-slate-100">{node.shot.shotCode}</div>
                   {sceneName && (
-                    <div className="text-xs text-gray-500">{sceneName}</div>
+                    <div className="text-xs text-slate-400">{sceneName}</div>
                   )}
-                  <div className="text-xs text-gray-600">{node.shot.durationTarget}s</div>
+                  <div className="text-xs text-slate-300">{(node.shot.duration / 1000).toFixed(1)}s</div>
                 </div>
               </div>
             );
@@ -285,13 +285,13 @@ export function CanvasView({ onSelect }: CanvasViewProps) {
         </div>
 
         {/* Mini-map */}
-        <div className="absolute bottom-4 right-4 w-48 h-32 bg-white border border-gray-300 rounded shadow-lg opacity-75 hover:opacity-100 transition-opacity">
-          <div className="text-xs text-gray-600 p-1 border-b border-gray-200">Mini-map</div>
+        <div className="absolute bottom-4 right-4 w-48 h-32 bg-slate-800 border border-slate-600 rounded shadow-lg opacity-75 hover:opacity-100 transition-opacity">
+          <div className="text-xs text-slate-300 p-1 border-b border-slate-700">Mini-map</div>
           <div className="relative w-full h-24 overflow-hidden">
             {Array.from(nodes.values()).map((node) => (
               <div
                 key={node.shot.id}
-                className="absolute bg-blue-500 rounded"
+                className="absolute bg-slate-400 rounded"
                 style={{
                   left: `${(node.x / 2000) * 100}%`,
                   top: `${(node.y / 1500) * 100}%`,
