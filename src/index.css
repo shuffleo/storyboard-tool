@@ -42,3 +42,171 @@ html, body, #root {
   scrollbar-width: none;  /* Firefox */
 }
 
+/* Retro Skin - Brutalist Design */
+.retro-skin {
+  --retro-bg: #000000;
+  --retro-text: #e5e5e5;
+  --retro-text-dim: #999999;
+  --retro-border: #333333;
+  --retro-hover: #1a1a1a;
+  --retro-accent: #666666;
+}
+
+.retro-skin body,
+.retro-skin #root {
+  background-color: var(--retro-bg) !important;
+  color: var(--retro-text) !important;
+  font-family: 'Courier New', 'Monaco', 'Menlo', 'Consolas', monospace !important;
+}
+
+.retro-skin * {
+  border-radius: 0 !important;
+  font-family: 'Courier New', 'Monaco', 'Menlo', 'Consolas', monospace !important;
+}
+
+/* Remove all rounded corners */
+.retro-skin .rounded,
+.retro-skin .rounded-md,
+.retro-skin .rounded-lg,
+.retro-skin .rounded-full,
+.retro-skin [class*="rounded"] {
+  border-radius: 0 !important;
+}
+
+/* Minimal borders - only where necessary */
+.retro-skin .border,
+.retro-skin [class*="border"] {
+  border-width: 1px !important;
+  border-color: var(--retro-border) !important;
+}
+
+/* Remove most borders, keep only essential ones */
+.retro-skin button:not(:hover):not(:focus),
+.retro-skin input:not(:focus),
+.retro-skin textarea:not(:focus),
+.retro-skin select:not(:focus) {
+  border: none !important;
+  outline: none !important;
+}
+
+.retro-skin button:hover,
+.retro-skin button:focus,
+.retro-skin input:focus,
+.retro-skin textarea:focus,
+.retro-skin select:focus {
+  border: 1px solid var(--retro-border) !important;
+  outline: none !important;
+}
+
+/* Typographic hierarchy */
+.retro-skin h1,
+.retro-skin h2,
+.retro-skin h3,
+.retro-skin h4,
+.retro-skin h5,
+.retro-skin h6 {
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.retro-skin button,
+.retro-skin input,
+.retro-skin textarea,
+.retro-skin select {
+  font-family: 'Courier New', 'Monaco', 'Menlo', 'Consolas', monospace !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Background colors */
+.retro-skin .bg-slate-900,
+.retro-skin .bg-slate-800,
+.retro-skin .bg-slate-700,
+.retro-skin .bg-slate-600 {
+  background-color: var(--retro-bg) !important;
+}
+
+.retro-skin .hover\:bg-slate-700:hover,
+.retro-skin .hover\:bg-slate-600:hover {
+  background-color: var(--retro-hover) !important;
+}
+
+/* Text colors */
+.retro-skin .text-slate-100,
+.retro-skin .text-slate-200,
+.retro-skin .text-slate-300 {
+  color: var(--retro-text) !important;
+}
+
+.retro-skin .text-slate-400,
+.retro-skin .text-slate-500 {
+  color: var(--retro-text-dim) !important;
+}
+
+/* Shadows - remove them */
+.retro-skin * {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* Spacing - use typography for hierarchy instead of padding */
+.retro-skin button {
+  padding: 0.5em 1em !important;
+  margin: 0 !important;
+}
+
+.retro-skin input,
+.retro-skin textarea,
+.retro-skin select {
+  padding: 0.5em !important;
+  background-color: var(--retro-bg) !important;
+  color: var(--retro-text) !important;
+  border: none !important;
+}
+
+.retro-skin input:focus,
+.retro-skin textarea:focus,
+.retro-skin select:focus {
+  border: 1px solid var(--retro-border) !important;
+  background-color: var(--retro-hover) !important;
+}
+
+/* Cards and panels */
+.retro-skin [class*="card"],
+.retro-skin [class*="panel"],
+.retro-skin [class*="container"] {
+  background-color: var(--retro-bg) !important;
+  border: none !important;
+}
+
+/* Tables */
+.retro-skin table {
+  border-collapse: collapse !important;
+}
+
+.retro-skin table td,
+.retro-skin table th {
+  border: 1px solid var(--retro-border) !important;
+  padding: 0.5em !important;
+}
+
+/* Modals and popovers */
+.retro-skin [class*="modal"],
+.retro-skin [class*="popover"],
+.retro-skin [class*="dropdown"] {
+  background-color: var(--retro-bg) !important;
+  border: 1px solid var(--retro-border) !important;
+  box-shadow: none !important;
+}
+
+/* Keep red for errors/deletions */
+.retro-skin .text-red-400,
+.retro-skin .text-red-500,
+.retro-skin .bg-red-600,
+.retro-skin .bg-red-700 {
+  color: #ff4444 !important;
+  background-color: #330000 !important;
+}
+

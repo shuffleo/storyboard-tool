@@ -47,6 +47,14 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Apply retro skin on mount if enabled
+  useEffect(() => {
+    const retroSkinEnabled = localStorage.getItem('retroSkin') === 'true';
+    if (retroSkinEnabled) {
+      document.documentElement.classList.add('retro-skin');
+    }
+  }, []);
+
   const handleSelect = (id: string, type: 'project' | 'scene' | 'shot' | 'frame') => {
       debugLogger.log('App', 'handleSelect called', { 
       id, 

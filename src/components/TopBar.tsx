@@ -30,8 +30,22 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [debugMode, setDebugMode] = useState(debugLogger.isEnabled());
+  const [retroSkin, setRetroSkin] = useState(() => {
+    return localStorage.getItem('retroSkin') === 'true';
+  });
   const menuRef = useRef<HTMLDivElement>(null);
   const clearAllContent = useStore((state) => state.clearAllContent);
+  
+  // Apply retro skin class to root element
+  useEffect(() => {
+    const root = document.documentElement;
+    if (retroSkin) {
+      root.classList.add('retro-skin');
+    } else {
+      root.classList.remove('retro-skin');
+    }
+    localStorage.setItem('retroSkin', String(retroSkin));
+  }, [retroSkin]);
 
   const formatLastSaved = () => {
     // Use Google sync time if connected and synced, otherwise use local save time
@@ -363,6 +377,15 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                   className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
                 >
                   {debugMode ? 'Disable Debug Mode' : 'Enable Debug Mode'}
+                </button>
+                <button
+                  onClick={() => {
+                    setRetroSkin(!retroSkin);
+                    setMenuOpen(false);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                >
+                  {retroSkin ? 'Disable Retro Skin' : 'Enable Retro Skin'}
                 </button>
                 <button
                   onClick={() => {
