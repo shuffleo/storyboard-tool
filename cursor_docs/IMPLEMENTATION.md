@@ -8,15 +8,16 @@ This is a local-first web application for animation project management. All data
 ### State Management
 - **Zustand Store** (`src/store/useStore.ts`): Single source of truth for all project data
 - **IndexedDB** (`src/db/indexeddb.ts`): Local persistence layer
-- **History System**: Undo/Redo with 50 action limit
+- **History System**: Undo/Redo with 100 action limit
 
 ### Styling
 - **Tailwind CSS**: Utility-first CSS framework
-- **Dark Mode**: Explicitly forced to light mode in `src/index.css` to prevent system dark mode from causing UI issues (white text on white background)
+- **Dark Mode**: Explicitly forced to dark mode in `src/index.css` with neutral grayscale palette (slate colors)
 
 ### Views
 1. **TableView** (`src/views/TableView.tsx`): Spreadsheet-like view for editing shots with scene grouping, compact mode, and bulk operations
-2. **StoryboardView** (`src/views/StoryboardView.tsx`): Card-based visual storyboard with multi-select, keyboard navigation, and image carousel
+2. **StoryboardView** (`src/views/StoryboardView.tsx`): Card-based visual storyboard with multi-select, keyboard navigation, drag-and-drop reordering, and image carousel
+3. **AnimaticsView** (`src/views/AnimaticsView.tsx`): Timeline-based playback with video player, Inspector panel, keyboard shortcuts, zoom controls, and frame editing
 
 ## Critical Implementation Details
 
@@ -98,10 +99,11 @@ reorderShots(newOrder);
 
 #### Key Components
 1. **StoryboardView** (main component)
-   - Manages: layout, density, selection, keyboard navigation, image carousel
-   - State: `selectedShots`, `focusedIndex`, `layout`, `density`, `currentImageIndex`
-   - Features: Add Shot/Scene buttons, multi-select, keyboard navigation
+   - Manages: layout, density, selection, keyboard navigation, image carousel, drag-and-drop
+   - State: `selectedShots`, `focusedIndex`, `layout`, `density`, `currentImageIndex`, `dragShotId`
+   - Features: Drag-and-drop reordering, multi-select, keyboard navigation
    - **Sorting**: Shots by `sceneNumber` then `shotCode`
+   - **Removed**: Add Shot/Scene buttons (hidden in Storyboard view)
 
 2. **Card Component** (inline, not separate)
    - Contains: arrow buttons, shot code, scene badge, image (with carousel), script
@@ -109,10 +111,12 @@ reorderShots(newOrder);
 
 #### Important Functions
 - `handleMoveShot`: Moves a shot up/down (same as TableView)
-- `handleCardClick`: Handles multi-select (Cmd/Ctrl+Click, Shift+Click)
+- `handleCardClick`: Handles multi-select (Cmd/Ctrl+Click, Shift+Click) with validation and error handling
+- `handleCardDragStart`: Starts drag operation for shot reordering
+- `handleCardDrag`: Handles drag operation, validates scene matching
 - `handleMoveSelected`: Moves multiple selected shots with arrow keys
-- `handleImageUpload`: Opens file picker for image upload
-- `handleImageDrop`: Handles drag-and-drop image uploads
+- `handleImageUpload`: Opens file picker for image upload (with error handling)
+- `handleImageDrop`: Handles drag-and-drop image uploads (with error handling)
 - Image carousel: Navigation arrows outside image area for better accessibility
 
 #### Arrow Button Location
@@ -120,6 +124,12 @@ reorderShots(newOrder);
 - Vertical stack (up arrow on top, down arrow below)
 
 ### Text Field Editing
+
+#### Auto-Resizing Textareas
+- Script and General Notes fields use `AutoResizeTextarea` component
+- Automatically grows to fit content (minimum 4rem height)
+- Resizes in real-time as user types
+- Prevents text field from shrinking when clicked
 
 #### Keyboard Shortcuts (CRITICAL - DO NOT BREAK)
 All text fields MUST allow standard shortcuts:
@@ -142,7 +152,8 @@ onKeyDown={(e) => {
 
 #### Where This Applies
 - Shot code input
-- Script textarea
+- Script textarea (auto-resizing)
+- General Notes textarea (auto-resizing)
 - Scene name input
 - Any editable text field
 
@@ -176,17 +187,38 @@ onKeyDown={(e) => {
 - Delete (trash icon button)
 - Keyboard: Cmd/Ctrl+Arrow Up/Down to move selected shots
 
+### Delete Shot/Scene Dialog
+
+#### Last Shot Deletion
+- When deleting the last shot in a scene, a modal dialog appears with 3 options:
+  - "Delete row only" - Deletes only the shot
+  - "Delete row and scene" - Deletes both the shot and the scene
+  - "Cancel" - Cancels the deletion
+- For non-last shots, a simple confirmation dialog appears
+- Implemented in `TableView.tsx` with `deleteDialog` state
+- Store's `deleteShot` function simplified to only handle deletion (no dialogs)
+
 ### Scene Management
+
+#### Default Project Initialization
+- New projects start with 3 scenes, each with 5 shots
+- No project should start empty
+- Located in `init` function in `useStore.ts`
 
 #### Scene 0
 - All new shots are assigned to Scene 0 by default
 - Scene 0 is auto-created if it doesn't exist
 - Located in `createShot` function in `useStore.ts`
 
+#### Scene Creation
+- When creating a new scene, at least one shot is automatically created for it
+- Located in `createScene` function in `useStore.ts`
+
 #### Scene Editing
 - Scene names are editable inline in grouped view
 - Click scene header to edit
 - "+ Add Row" button in each scene section adds shots to that scene
+- Scene header row spans edge-to-edge (no white gap for actions column)
 
 #### Sorting
 - **CRITICAL**: Scenes are sorted by `sceneNumber` (as number, low to high)
@@ -198,7 +230,8 @@ onKeyDown={(e) => {
 ### Compact Mode (TableView)
 
 #### Features
-- Toggle in top bar
+- Text button toggle in top bar (matches StoryboardView style)
+- Shows "Compact" when in detailed mode, "Detailed" when in compact mode
 - Hides: checkbox column, arrow buttons column, actions column
 - Reduces row heights and padding
 - Maintains all editing functionality
@@ -209,14 +242,67 @@ onKeyDown={(e) => {
 - Status (removed from both card and side panel)
 - Camera Notes (removed)
 - Animation Notes (removed)
-- Duration (seconds) (removed)
 
 #### Remaining Fields
-- Shot Code
-- Scene (dropdown selector - NEW)
+- Shot Code (moved to header, editable inline)
+- Scene (dropdown selector with 4px margin on arrow)
+- Duration (milliseconds, minimum 300ms) - shown in Inspector only
 - Script Text
 - Tags
 - General Notes
+- Image Carousel (NEW): Shows all images with navigation, delete, and "Set as main" options
+
+#### Header Layout
+- Shot Code field moved to header next to "Shot" label
+- Close button with proper spacing (gap-3)
+- Close button hidden in Animatics view
+
+### Undo/Redo System
+
+#### History Management
+- Supports up to 100 actions in history
+- `pushHistory()` is called before state changes
+- `undo()` and `redo()` restore previous states without saving
+- `canUndo` and `canRedo` flags track available actions
+- Fixed: `redo` now correctly calculates `canRedo` based on history position
+
+### Error Handling and Click Safety
+
+#### Blank Screen Prevention
+- All `onSelect` calls wrapped in try-catch blocks
+- Null/undefined checks before accessing frame/shot properties
+- Validation of `id` and `type` parameters before state updates
+- Event propagation properly stopped to prevent conflicts
+- Invalid frame/shot data skipped during rendering
+
+#### Click Handler Safety
+- **AnimaticsView**: Frame clicks validated, drag/resize conflicts prevented
+- **StoryboardView**: Card clicks ignore buttons/SVGs, bounds checking for array access
+- **TableView**: Shot selection validated before calling `onSelect`
+- **App.tsx**: `handleSelect` validates parameters before updating state
+
+### AnimaticsView Structure
+
+#### Key Components
+1. **Timeline**: Time ruler (hidden scrollbar) and timeline track (visible scrollbar) with synchronized scrolling
+2. **Video Player**: Displays current frame image with error handling
+3. **Playback Controls**: Play/pause, seek, zoom controls
+4. **Inspector Panel**: Reuses same Inspector component as other views
+
+#### Important Functions
+- `handleFrameClick`: Validates frame before selecting (prevents blank screen)
+- `handleImageUpload` (AnimaticsView): Replaces corrupted images via file input dialog
+- `handleImageError` (AnimaticsView): Detects corrupted images and stores frame ID for replacement
+- Debug Logger: Comprehensive logging with categories, levels, timestamps, and error stack traces
+- `handleShotDragStart`: Validates frame before starting drag
+- `handleResizeStart`: Validates frame before starting resize
+- `currentFrame`: Validates timeline frames, skips invalid entries
+- `currentFrameImage`: Try-catch wrapped, handles missing images gracefully
+
+#### Scrollbar Management
+- Time ruler scrollbar hidden via CSS (`scrollbar-hide` class)
+- Timeline track scrollbar visible
+- Scroll events synchronized bidirectionally
 
 ## Common Refactoring Mistakes to Avoid
 
@@ -300,6 +386,20 @@ After any refactoring, verify:
 - [ ] ZIP import works and restores images
 - [ ] Import confirmation dialog appears (Replace vs Add)
 - [ ] Dark mode doesn't break UI (forced light mode styling)
+- [ ] Textareas auto-resize to fit content (Script and General Notes)
+- [ ] Delete last shot shows 3-option dialog (Delete row only / Delete row and scene / Cancel)
+- [ ] Compact mode toggle is a text button (not checkbox)
+- [ ] Undo/Redo works correctly for all actions (100 action limit)
+- [ ] New projects start with 3 scenes and 5 shots each
+- [ ] New scenes automatically get at least one shot
+- [ ] Click handlers don't cause blank screens (Animatics, Storyboard, Table views)
+- [ ] Image error handling shows error message instead of blank screen
+- [ ] Scrollbar sync works in Animatics view (time ruler hidden, timeline visible)
+- [ ] Drag-and-drop works in Storyboard and Animatics views with scene dimming
+- [ ] Inspector panel shot code in header works correctly
+- [ ] Inspector panel image carousel works (navigation, delete, set main)
+- [ ] Delete All Content feature works with confirmation dialog
+- [ ] Actions column heading is hidden in Table view
 
 ## File Structure
 
@@ -364,4 +464,23 @@ src/
 - ZIP export/import with images supported
 - Dark mode styling forced to light mode to prevent UI issues
 - Image count overlay improved (removed "Replace" text, better visibility)
+- Auto-resizing textareas for Script and General Notes fields
+- Delete shot/scene dialog with 3 options for last shot in scene
+- Compact mode toggle changed from checkbox to text button (matches StoryboardView)
+- Undo/Redo system fixed to correctly track history (100 action limit)
+- Default project initialization: 3 scenes with 5 shots each
+- New scenes automatically create at least one shot
+- Google Drive integration support (requires API credentials setup)
+- Click handler safety: All handlers validated to prevent blank screen crashes
+- Error handling: Comprehensive null checks and try-catch blocks
+- Scrollbar sync: Time ruler scrollbar hidden, timeline scrollbar visible and synchronized
+- Drag-and-drop: Storyboard and Animatics views support drag reordering with scene dimming
+- Inspector improvements: Shot code in header, image carousel, proper spacing
+- Delete All Content: Available in three-dot menu with confirmation dialog
+- Actions column: Heading hidden, column still functional
+- Debug Panel: Persistent debug logging system with React Portal rendering (always visible, even during crashes)
+- Debug Logger: Custom logging system with categories, levels, timestamps, and persistent storage
+- React Hooks Fix: Fixed conditional hook calls in Inspector component (image carousel state management)
+- Corrupted Image Handling: Animatics view detects corrupted images and provides "Upload New Image" button to replace them
+- Verbose Logging: Comprehensive logging throughout critical UI interaction points for debugging
 

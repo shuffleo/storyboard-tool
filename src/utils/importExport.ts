@@ -54,7 +54,7 @@ export async function exportToCSV(): Promise<string> {
         shot.shotCode,
         scene ? `Scene ${scene.sceneNumber}` : '',
         `"${shot.scriptText.replace(/"/g, '""')}"`,
-        shot.durationTarget.toString(),
+        (shot.duration / 1000).toString(), // Convert ms to seconds for CSV
         shot.status,
         shot.tags.join('; '),
       ];
@@ -99,6 +99,7 @@ export async function importFromCSV(csv: string, replace: boolean = true): Promi
   const shots = useStore.getState().shots.sort((a, b) => a.orderIndex - b.orderIndex);
   for (let index = 0; index < lines.length - 1; index++) {
     const line = lines[index + 1];
+    // Parse CSV: split by comma, trim, remove quotes
     const values = line.split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
     
     let shot: Shot | undefined = shots[index];
@@ -110,7 +111,7 @@ export async function importFromCSV(csv: string, replace: boolean = true): Promi
     }
     if (!shot) continue;
 
-    // Find scene by name if provided
+    // Match scene by number or title
     let sceneId: string | undefined = undefined;
     if (values[sceneIndex]) {
       const sceneMatch = scenes.find((s) => 
@@ -122,7 +123,7 @@ export async function importFromCSV(csv: string, replace: boolean = true): Promi
     updateShot(shot.id, {
       shotCode: values[shotCodeIndex] || shot.shotCode,
       scriptText: values[scriptIndex] || '',
-      durationTarget: parseFloat(values[durationIndex]) || 0,
+      duration: Math.max(300, (parseFloat(values[durationIndex]) || 1) * 1000), // Convert seconds to ms, min 300ms
       status: (values[statusIndex] as any) || 'todo',
       tags: values[tagsIndex] ? values[tagsIndex].split(';').map((t) => t.trim()) : [],
       sceneId,
@@ -134,42 +135,188 @@ export async function exportStoryboardPDF(): Promise<void> {
   const state = useStore.getState();
 
   const pdf = new jsPDF();
-  const shots = state.shots.sort((a, b) => a.orderIndex - b.orderIndex);
+  const shots = state.shots.sort((a, b) => {
+    // Sort by scene number first, then by shot code
+    const sceneA = state.scenes.find(s => s.id === a.sceneId);
+    const sceneB = state.scenes.find(s => s.id === b.sceneId);
+    const sceneNumA = sceneA ? (parseInt(sceneA.sceneNumber, 10) || 0) : 9999;
+    const sceneNumB = sceneB ? (parseInt(sceneB.sceneNumber, 10) || 0) : 9999;
+    if (sceneNumA !== sceneNumB) return sceneNumA - sceneNumB;
+    return parseInt(a.shotCode, 10) - parseInt(b.shotCode, 10);
+  });
   const frames = state.frames;
 
-  let y = 20;
+  const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
-  const margin = 20;
-  const imageWidth = 80;
-  const imageHeight = 60;
+  const margin = 15;
+  const imageWidth = 55;
+  const textWidth = pageWidth - margin * 2 - imageWidth - 10;
+  const imagesPerPage = 3;
+  let pageNumber = 1;
+  let currentSceneId: string | undefined = undefined;
 
-  shots.forEach((shot) => {
-    if (y + imageHeight + 40 > pageHeight - margin) {
+  const addPageNumber = () => {
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+    const pageNumText = `Page ${pageNumber}`;
+    const textWidth = pdf.getTextWidth(pageNumText);
+    pdf.text(pageNumText, pageWidth - margin - textWidth, pageHeight - margin);
+    pdf.setTextColor(0, 0, 0);
+  };
+
+  const addSceneHeader = (sceneId: string | undefined) => {
+    if (!sceneId) return;
+    const scene = state.scenes.find(s => s.id === sceneId);
+    if (!scene) return;
+    
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    const sceneTitle = scene.title && scene.title.trim() 
+      ? `${scene.sceneNumber}: ${scene.title}`
+      : `Scene ${scene.sceneNumber}`;
+    pdf.text(sceneTitle, margin, 20);
+    pdf.setFont('helvetica', 'normal');
+    currentSceneId = sceneId;
+  };
+
+  let y = 35; // Start below scene header
+  let imagesOnPage = 0;
+
+  // Get natural image dimensions to preserve aspect ratio in PDF
+  const getImageDimensions = (base64Image: string): Promise<{ width: number; height: number }> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        resolve({ width: img.width, height: img.height });
+      };
+      img.onerror = () => {
+        resolve({ width: 55, height: 40 }); // Default dimensions
+      };
+      img.src = base64Image;
+    });
+  };
+
+  for (let i = 0; i < shots.length; i++) {
+    const shot = shots[i];
+    // Check if we need a new page (3 images per page)
+    if (imagesOnPage >= imagesPerPage) {
+      addPageNumber();
       pdf.addPage();
-      y = 20;
+      pageNumber++;
+      y = 35;
+      imagesOnPage = 0;
+      currentSceneId = undefined;
+    }
+
+    // Add scene header if scene changed
+    if (shot.sceneId !== currentSceneId) {
+      // If not at the top of a new page, we need to add scene header
+      if (y > 35) {
+        // Not enough space, go to next page
+        addPageNumber();
+        pdf.addPage();
+        pageNumber++;
+        y = 35;
+        imagesOnPage = 0;
+      }
+      addSceneHeader(shot.sceneId);
+      y = 35;
     }
 
     const shotFrames = frames.filter((f) => f.shotId === shot.id).sort((a, b) => a.orderIndex - b.orderIndex);
 
-    pdf.setFontSize(12);
+    // Shot code and duration
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
     pdf.text(`Shot ${shot.shotCode}`, margin, y);
-    y += 8;
+    // Add duration next to shot code
+    const durationSeconds = (shot.duration / 1000).toFixed(1);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+    const shotCodeWidth = pdf.getTextWidth(`Shot ${shot.shotCode}`);
+    pdf.text(`(${durationSeconds}s)`, margin + shotCodeWidth + 3, y);
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(10);
+    y += 6;
 
+    // Image on the left
+    const imageX = margin;
+    const imageY = y;
+    const maxImageWidth = 55;
+    let actualImageWidth = maxImageWidth;
+    let actualImageHeight = 40;
+    
     if (shotFrames.length > 0) {
       try {
-        pdf.addImage(shotFrames[0].image, 'JPEG', margin, y, imageWidth, imageHeight);
+        // Get image dimensions to preserve aspect ratio
+        const dimensions = await getImageDimensions(shotFrames[0].image);
+        const aspectRatio = dimensions.width / dimensions.height;
+        
+        // Use max width, calculate height based on aspect ratio
+        actualImageWidth = maxImageWidth;
+        actualImageHeight = maxImageWidth / aspectRatio;
+        
+        // If height is too large, scale down based on height instead
+        const maxImageHeight = 60;
+        if (actualImageHeight > maxImageHeight) {
+          actualImageHeight = maxImageHeight;
+          actualImageWidth = maxImageHeight * aspectRatio;
+        }
+        
+        // Determine image format from base64 string
+        let format = 'JPEG';
+        if (shotFrames[0].image.startsWith('data:image/png')) {
+          format = 'PNG';
+        } else if (shotFrames[0].image.startsWith('data:image/jpeg') || shotFrames[0].image.startsWith('data:image/jpg')) {
+          format = 'JPEG';
+        }
+        
+        pdf.addImage(shotFrames[0].image, format, imageX, imageY, actualImageWidth, actualImageHeight);
       } catch (e) {
-        pdf.text('Image load error', margin, y + 10);
+        pdf.setFontSize(8);
+        pdf.text('Image load error', imageX, imageY + actualImageHeight / 2);
       }
+    } else {
+      pdf.setDrawColor(200, 200, 200);
+      pdf.rect(imageX, imageY, actualImageWidth, actualImageHeight);
+      pdf.setFontSize(8);
+      pdf.text('No image', imageX + actualImageWidth / 2 - 10, imageY + actualImageHeight / 2);
     }
 
-    y += imageHeight + 5;
+    // Text on the right
+    const textX = margin + actualImageWidth + 10;
+    let textY = imageY;
 
-    pdf.setFontSize(10);
-    const scriptLines = pdf.splitTextToSize(shot.scriptText || '', 170);
-    pdf.text(scriptLines, margin, y);
-    y += scriptLines.length * 5 + 10;
-  });
+    // Script text
+    if (shot.scriptText && shot.scriptText.trim()) {
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(0, 0, 0);
+      const scriptLines = pdf.splitTextToSize(shot.scriptText, textWidth);
+      pdf.text(scriptLines, textX, textY);
+      textY += scriptLines.length * 4.5;
+    }
+
+    // General Notes with different color
+    if (shot.generalNotes && shot.generalNotes.trim()) {
+      textY += 2; // Small gap
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'italic');
+      pdf.setTextColor(100, 100, 150); // Different color for general notes
+      const notesLines = pdf.splitTextToSize(shot.generalNotes, textWidth);
+      pdf.text(notesLines, textX, textY);
+      pdf.setTextColor(0, 0, 0); // Reset color
+      textY += notesLines.length * 4.5;
+    }
+
+    // Move to next position
+    y = Math.max(imageY + actualImageHeight, textY) + 8;
+    imagesOnPage++;
+  }
+
+  // Add page number to last page
+  addPageNumber();
 
   pdf.save(`${state.project.title}-storyboard.pdf`);
 }
@@ -215,6 +362,105 @@ function getExtensionFromMime(mime: string): string {
 }
 
 /**
+ * Exports animatics as MP4 video
+ * Creates a video from shots with their durations
+ */
+export async function exportAnimaticsToMP4(): Promise<void> {
+  const state = useStore.getState();
+  const project = state.project;
+  
+  if (!project) {
+    throw new Error('No project loaded');
+  }
+
+  // Sort shots by order
+  const sortedShots = [...state.shots].sort((a, b) => {
+    const sceneA = state.scenes.find(s => s.id === a.sceneId);
+    const sceneB = state.scenes.find(s => s.id === b.sceneId);
+    const sceneNumA = sceneA ? parseInt(sceneA.sceneNumber) : 999;
+    const sceneNumB = sceneB ? parseInt(sceneB.sceneNumber) : 999;
+    if (sceneNumA !== sceneNumB) return sceneNumA - sceneNumB;
+    return a.orderIndex - b.orderIndex;
+  });
+
+  // Create canvas for rendering
+  const canvas = document.createElement('canvas');
+  canvas.width = 1920; // Full HD width
+  canvas.height = 1080; // Full HD height
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Failed to create canvas context');
+  }
+
+  // Create video stream using MediaRecorder
+  const stream = canvas.captureStream(30); // 30 FPS
+  const mediaRecorder = new MediaRecorder(stream, {
+    mimeType: 'video/webm;codecs=vp9',
+  });
+
+  const chunks: Blob[] = [];
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) {
+      chunks.push(e.data);
+    }
+  };
+
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.title || 'animatics'}.webm`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  mediaRecorder.start();
+
+  // Render each shot
+  for (const shot of sortedShots) {
+    const shotFrames = state.frames
+      .filter(f => f.shotId === shot.id)
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+    
+    const frameImage = shotFrames[0]?.image;
+    if (frameImage) {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          // Clear canvas
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Draw image centered
+          const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+          const x = (canvas.width - img.width * scale) / 2;
+          const y = (canvas.height - img.height * scale) / 2;
+          ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+          
+          resolve();
+        };
+        img.onerror = reject;
+        img.src = frameImage;
+      });
+    } else {
+      // Draw placeholder
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#64748b';
+      ctx.font = '48px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(shot.shotCode, canvas.width / 2, canvas.height / 2);
+    }
+
+    // Wait for shot duration
+    await new Promise(resolve => setTimeout(resolve, shot.duration));
+  }
+
+  mediaRecorder.stop();
+}
+
+/**
  * Exports project data and all images to a ZIP file
  */
 export async function exportToZIP(): Promise<void> {
@@ -241,7 +487,7 @@ export async function exportToZIP(): Promise<void> {
   const imageMap = new Map<string, { counter: number; filename: string }>(); // Track image usage to avoid duplicates
   let imageCounter = 0;
 
-  // First pass: collect all unique images and generate filenames
+  // First pass: collect unique images (dedupe by base64 data)
   for (const frame of state.frames) {
     if (!frame.image) continue;
 
@@ -265,7 +511,7 @@ export async function exportToZIP(): Promise<void> {
     }
   }
 
-  // Create a mapping file that links frame IDs to image filenames
+  // Map frame IDs to image filenames for import restoration
   const imageMapping: Record<string, string> = {};
   state.frames.forEach(frame => {
     if (frame.image && imageMap.has(frame.image)) {

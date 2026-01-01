@@ -38,8 +38,7 @@ export interface Shot {
   orderIndex: number; // Global canonical order
   shotCode: string; // e.g. "010", "020", "030"
   scriptText: string;
-  durationTarget: number; // seconds
-  durationActual?: number;
+  duration: number; // milliseconds, minimum 300ms
   status: ShotStatus;
   tags: string[];
   cameraNotes: string;

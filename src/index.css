@@ -15,15 +15,235 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
-  /* Force light mode - prevent system dark mode from affecting UI */
-  background-color: #f9fafb;
-  color: #111827;
+  /* Force dark mode - prevent system light mode from affecting UI */
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+/* Force dark mode - disable light mode completely */
+html, body, #root {
+  color-scheme: dark !important;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
-  background-color: #f9fafb;
-  color: #111827;
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+/* Hide scrollbar for time ruler */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Retro Skin - Brutalist Design */
+.retro-skin {
+  --retro-bg: #000000;
+  --retro-text: #e5e5e5;
+  --retro-text-dim: #999999;
+  --retro-border: #333333;
+  --retro-hover: #1a1a1a;
+  --retro-accent: #666666;
+}
+
+.retro-skin body,
+.retro-skin #root {
+  background-color: var(--retro-bg) !important;
+  color: var(--retro-text) !important;
+  font-family: 'Courier New', 'Monaco', 'Menlo', 'Consolas', monospace !important;
+}
+
+.retro-skin * {
+  border-radius: 0 !important;
+  font-family: 'Courier New', 'Monaco', 'Menlo', 'Consolas', monospace !important;
+}
+
+/* Remove all rounded corners */
+.retro-skin .rounded,
+.retro-skin .rounded-md,
+.retro-skin .rounded-lg,
+.retro-skin .rounded-full,
+.retro-skin [class*="rounded"] {
+  border-radius: 0 !important;
+}
+
+/* Minimal borders - only where necessary */
+/* Use box-sizing: border-box to prevent stroke width doubling */
+.retro-skin .border,
+.retro-skin [class*="border"] {
+  box-sizing: border-box !important;
+  border-width: 1px !important;
+  border-color: var(--retro-border) !important;
+  border-style: solid !important;
+}
+
+/* Remove most borders, keep only essential ones */
+/* Use box-sizing: border-box to prevent layout shift on hover */
+.retro-skin button,
+.retro-skin input,
+.retro-skin textarea,
+.retro-skin select {
+  box-sizing: border-box !important;
+}
+
+.retro-skin button:not(:hover):not(:focus),
+.retro-skin input:not(:focus),
+.retro-skin textarea:not(:focus),
+.retro-skin select:not(:focus) {
+  border: 1px solid transparent !important;
+  outline: none !important;
+}
+
+.retro-skin button:hover,
+.retro-skin button:focus,
+.retro-skin input:focus,
+.retro-skin textarea:focus,
+.retro-skin select:focus {
+  border: 1px solid var(--retro-border) !important;
+  outline: none !important;
+}
+
+/* Typographic hierarchy */
+.retro-skin h1,
+.retro-skin h2,
+.retro-skin h3,
+.retro-skin h4,
+.retro-skin h5,
+.retro-skin h6 {
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.retro-skin button,
+.retro-skin input,
+.retro-skin textarea,
+.retro-skin select {
+  font-family: 'Courier New', 'Monaco', 'Menlo', 'Consolas', monospace !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Background colors */
+.retro-skin .bg-slate-900,
+.retro-skin .bg-slate-800,
+.retro-skin .bg-slate-700,
+.retro-skin .bg-slate-600 {
+  background-color: var(--retro-bg) !important;
+}
+
+.retro-skin .hover\:bg-slate-700:hover,
+.retro-skin .hover\:bg-slate-600:hover {
+  background-color: var(--retro-hover) !important;
+}
+
+/* Text colors */
+.retro-skin .text-slate-100,
+.retro-skin .text-slate-200,
+.retro-skin .text-slate-300 {
+  color: var(--retro-text) !important;
+}
+
+.retro-skin .text-slate-400,
+.retro-skin .text-slate-500 {
+  color: var(--retro-text-dim) !important;
+}
+
+/* Shadows - remove them */
+.retro-skin * {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* Spacing - use typography for hierarchy instead of padding */
+.retro-skin button {
+  padding: 0.5em 1em !important;
+  margin: 0 !important;
+}
+
+.retro-skin input,
+.retro-skin textarea,
+.retro-skin select {
+  padding: 0.5em !important;
+  background-color: var(--retro-bg) !important;
+  color: var(--retro-text) !important;
+  border: 1px solid transparent !important;
+  box-sizing: border-box !important;
+}
+
+.retro-skin input:focus,
+.retro-skin textarea:focus,
+.retro-skin select:focus {
+  border: 1px solid var(--retro-border) !important;
+  background-color: var(--retro-hover) !important;
+}
+
+/* User input text should be white, placeholders should be dim */
+.retro-skin input::placeholder,
+.retro-skin textarea::placeholder {
+  color: var(--retro-text-dim) !important;
+}
+
+.retro-skin input:not(:placeholder-shown),
+.retro-skin textarea:not(:placeholder-shown),
+.retro-skin select {
+  color: var(--retro-text) !important;
+}
+
+/* Cards and panels */
+.retro-skin [class*="card"],
+.retro-skin [class*="panel"],
+.retro-skin [class*="container"] {
+  background-color: var(--retro-bg) !important;
+  border: none !important;
+}
+
+/* Tables */
+.retro-skin table {
+  border-collapse: collapse !important;
+}
+
+.retro-skin table td,
+.retro-skin table th {
+  border: 1px solid var(--retro-border) !important;
+  padding: 0.5em !important;
+}
+
+/* Modals and popovers */
+.retro-skin [class*="modal"],
+.retro-skin [class*="popover"],
+.retro-skin [class*="dropdown"] {
+  background-color: var(--retro-bg) !important;
+  border: 1px solid var(--retro-border) !important;
+  box-shadow: none !important;
+}
+
+/* Keep red for errors/deletions */
+.retro-skin .text-red-400,
+.retro-skin .text-red-500,
+.retro-skin .bg-red-600,
+.retro-skin .bg-red-700 {
+  color: #ff4444 !important;
+  background-color: #330000 !important;
+}
+
+/* Checkbox styling - no rounded corners, white when selected, same stroke width */
+.retro-skin input[type="checkbox"] {
+  border-radius: 0 !important;
+  border-width: 1px !important;
+  border-color: var(--retro-border) !important;
+  accent-color: var(--retro-text) !important;
+}
+
+.retro-skin input[type="checkbox"]:checked {
+  background-color: var(--retro-text) !important;
+  border-color: var(--retro-text) !important;
 }
 

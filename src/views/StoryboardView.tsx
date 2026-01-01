@@ -1,5 +1,6 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store/useStore';
+import { debugLogger } from '../utils/debug';
 
 interface StoryboardViewProps {
   onSelect: (id: string, type: 'project' | 'scene' | 'shot' | 'frame') => void;
@@ -11,13 +12,31 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   const scenes = useStore((state) => state.scenes);
   const reorderShots = useStore((state) => state.reorderShots);
   const addFrame = useStore((state) => state.addFrame);
-  const createShot = useStore((state) => state.createShot);
-  const createScene = useStore((state) => state.createScene);
-  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
-  const [density, setDensity] = useState<'compact' | 'detailed'>('detailed');
+  const deleteShot = useStore((state) => state.deleteShot);
+  const bulkUpdateShots = useStore((state) => state.bulkUpdateShots);
+  // Persistent layout and density preferences
+  const [layout, setLayout] = useState<'grid' | 'list'>(() => {
+    const saved = localStorage.getItem('storyboardLayout');
+    return (saved === 'grid' || saved === 'list') ? saved : 'grid';
+  });
+  const [density, setDensity] = useState<'compact' | 'detailed'>(() => {
+    const saved = localStorage.getItem('storyboardDensity');
+    return (saved === 'compact' || saved === 'detailed') ? saved : 'detailed';
+  });
+  
+  // Persist layout changes
+  useEffect(() => {
+    localStorage.setItem('storyboardLayout', layout);
+  }, [layout]);
+  
+  // Persist density changes
+  useEffect(() => {
+    localStorage.setItem('storyboardDensity', density);
+  }, [density]);
   const [selectedShots, setSelectedShots] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState<Map<string, number>>(new Map());
+  const [dragShotId, setDragShotId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -50,7 +69,10 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   const getSceneName = (sceneId?: string) => {
     if (!sceneId) return null;
     const scene = scenes.find((s) => s.id === sceneId);
-    return scene ? `Scene ${scene.sceneNumber}` : null;
+    if (!scene) return null;
+    // Use the same format as TableView: "sceneNumber: title" or just "sceneNumber" if no title
+    const title = scene.title && scene.title.trim() ? scene.title : `Scene ${scene.sceneNumber}`;
+    return `${scene.sceneNumber}: ${title}`;
   };
 
   /**
@@ -95,37 +117,295 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   };
 
   const handleCardClick = (e: React.MouseEvent, shotId: string, index: number) => {
-    // Don't handle clicks on drag handle or image area
-    if ((e.target as HTMLElement).closest('.drag-handle')) return;
-    if ((e.target as HTMLElement).closest('.image-area')) return;
+    debugLogger.log('StoryboardView', 'handleCardClick called', { 
+      shotId, 
+      index, 
+      sortedShotsLength: sortedShots.length,
+      eventTarget: (e.target as HTMLElement)?.tagName,
+      eventTargetClass: (e.target as HTMLElement)?.className,
+      ctrlKey: e.ctrlKey,
+      metaKey: e.metaKey,
+      shiftKey: e.shiftKey,
+      currentSelectedShots: Array.from(selectedShots),
+      focusedIndex
+    });
     
-    if (e.ctrlKey || e.metaKey) {
-      // Multi-select
-      const newSelected = new Set(selectedShots);
-      if (newSelected.has(shotId)) {
-        newSelected.delete(shotId);
+    e.stopPropagation();
+    
+    // Don't handle clicks on drag handle, image area, or buttons
+    const target = e.target as HTMLElement;
+    const dragHandle = target.closest('.drag-handle');
+    const imageArea = target.closest('.image-area');
+    const button = target.closest('button');
+    const svg = target.closest('svg');
+    
+    debugLogger.log('StoryboardView', 'Click target analysis', {
+      hasDragHandle: !!dragHandle,
+      hasImageArea: !!imageArea,
+      hasButton: !!button,
+      hasSvg: !!svg,
+      targetElement: target.tagName,
+      targetClasses: target.className
+    });
+    
+    if (dragHandle) {
+      debugLogger.log('StoryboardView', 'Click ignored - drag handle');
+      return;
+    }
+    if (imageArea) {
+      debugLogger.log('StoryboardView', 'Click ignored - image area');
+      return;
+    }
+    if (button) {
+      debugLogger.log('StoryboardView', 'Click ignored - button', { buttonText: button.textContent });
+      return;
+    }
+    if (svg) {
+      debugLogger.log('StoryboardView', 'Click ignored - svg');
+      return;
+    }
+    
+    debugLogger.log('StoryboardView', 'Validating click parameters', {
+      shotId,
+      shotIdType: typeof shotId,
+      shotIdLength: shotId?.length,
+      index,
+      indexType: typeof index,
+      sortedShotsLength: sortedShots.length,
+      indexInRange: index >= 0 && index < sortedShots.length
+    });
+    
+    if (!shotId || index < 0 || index >= sortedShots.length) {
+      debugLogger.warn('StoryboardView', 'Invalid card click - validation failed', { 
+        shotId, 
+        index, 
+        shotsLength: sortedShots.length,
+        shotIdValid: !!shotId,
+        indexValid: index >= 0 && index < sortedShots.length
+      });
+      return;
+    }
+    
+    const shot = sortedShots[index];
+    debugLogger.log('StoryboardView', 'Retrieved shot from array', {
+      shotExists: !!shot,
+      shotId: shot?.id,
+      shotCode: shot?.shotCode,
+      shotSceneId: shot?.sceneId,
+      shotOrderIndex: shot?.orderIndex
+    });
+    
+    if (!shot) {
+      debugLogger.error('StoryboardView', 'Shot not found at index - CRITICAL ERROR', undefined, { 
+        index, 
+        sortedShotsLength: sortedShots.length,
+        sortedShotsIds: sortedShots.map(s => s?.id),
+        sortedShotsCodes: sortedShots.map(s => s?.shotCode)
+      });
+      return;
+    }
+    
+    try {
+      if (e.ctrlKey || e.metaKey) {
+        debugLogger.log('StoryboardView', 'Multi-select mode activated', {
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          currentlySelected: Array.from(selectedShots),
+          shotIdInSelection: selectedShots.has(shotId)
+        });
+        // Multi-select
+        const newSelected = new Set(selectedShots);
+        if (newSelected.has(shotId)) {
+          debugLogger.log('StoryboardView', 'Removing from selection', { shotId });
+          newSelected.delete(shotId);
+        } else {
+          debugLogger.log('StoryboardView', 'Adding to selection', { shotId });
+          newSelected.add(shotId);
+        }
+        debugLogger.log('StoryboardView', 'Updating selected shots state', {
+          oldSelection: Array.from(selectedShots),
+          newSelection: Array.from(newSelected)
+        });
+        setSelectedShots(newSelected);
+        setFocusedIndex(index);
+        debugLogger.log('StoryboardView', 'Multi-select state updated', { newSelection: Array.from(newSelected), focusedIndex: index });
+      } else if (e.shiftKey && focusedIndex !== null) {
+        debugLogger.log('StoryboardView', 'Range select mode activated', { 
+          focusedIndex, 
+          index,
+          startIndex: Math.min(focusedIndex, index),
+          endIndex: Math.max(focusedIndex, index)
+        });
+        // Range select
+        const start = Math.min(focusedIndex, index);
+        const end = Math.max(focusedIndex, index);
+        const newSelected = new Set(selectedShots);
+        const selectedIds: string[] = [];
+        for (let i = start; i <= end && i < sortedShots.length; i++) {
+          if (sortedShots[i]?.id) {
+            newSelected.add(sortedShots[i].id);
+            selectedIds.push(sortedShots[i].id);
+          }
+        }
+        debugLogger.log('StoryboardView', 'Range selection calculated', {
+          start,
+          end,
+          selectedIds,
+          totalSelected: newSelected.size
+        });
+        setSelectedShots(newSelected);
+        setFocusedIndex(index);
       } else {
-        newSelected.add(shotId);
+        debugLogger.log('StoryboardView', 'Single select mode activated', { 
+          shotId, 
+          shotCode: shot.shotCode,
+          shotSceneId: shot.sceneId,
+          previousSelection: Array.from(selectedShots),
+          previousFocusedIndex: focusedIndex
+        });
+        // Single select
+        const newSelection = new Set([shotId]);
+        debugLogger.log('StoryboardView', 'Setting single selection', {
+          newSelection: Array.from(newSelection),
+          newFocusedIndex: index
+        });
+        setSelectedShots(newSelection);
+        setFocusedIndex(index);
+        debugLogger.log('StoryboardView', 'State updated, about to call onSelect', {
+          shotId,
+          shotCode: shot.shotCode,
+          shotExists: !!shot,
+          shotIdValid: !!shotId && shotId.length > 0
+        });
+        if (shotId) {
+          debugLogger.info('StoryboardView', 'Calling onSelect callback', { 
+            shotId, 
+            shotCode: shot.shotCode,
+            shotType: typeof shotId,
+            onSelectType: typeof onSelect,
+            onSelectExists: !!onSelect
+          });
+          try {
+            onSelect(shotId, 'shot');
+            debugLogger.log('StoryboardView', 'onSelect called successfully - no exception thrown');
+          } catch (selectError) {
+            debugLogger.error('StoryboardView', 'Exception thrown in onSelect callback', selectError, {
+              shotId,
+              shotCode: shot.shotCode
+            });
+            throw selectError; // Re-throw to be caught by outer try-catch
+          }
+        } else {
+          debugLogger.warn('StoryboardView', 'Not calling onSelect - shotId is falsy', { shotId });
+        }
       }
-      setSelectedShots(newSelected);
-      setFocusedIndex(index);
-    } else if (e.shiftKey && focusedIndex !== null) {
-      // Range select
-      const start = Math.min(focusedIndex, index);
-      const end = Math.max(focusedIndex, index);
-      const newSelected = new Set(selectedShots);
-      for (let i = start; i <= end; i++) {
-        newSelected.add(sortedShots[i].id);
-      }
-      setSelectedShots(newSelected);
-      setFocusedIndex(index);
-    } else {
-      // Single select
-      setSelectedShots(new Set([shotId]));
-      setFocusedIndex(index);
-      onSelect(shotId, 'shot');
+      debugLogger.log('StoryboardView', 'handleCardClick completed successfully');
+    } catch (error) {
+      debugLogger.error('StoryboardView', 'Error in handleCardClick - EXCEPTION CAUGHT', error, { 
+        shotId, 
+        index,
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        sortedShotsLength: sortedShots.length,
+        shotExists: !!sortedShots[index]
+      });
     }
   };
+
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Deselect if clicking on empty area (not on a card)
+    if ((e.target as HTMLElement).closest('[data-card]')) return;
+    setSelectedShots(new Set());
+    setFocusedIndex(null);
+  };
+
+  const handleTopBarClick = (e: React.MouseEvent) => {
+    // Allow dismissing selection by clicking empty area in top bars
+    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('select')) return;
+    setSelectedShots(new Set());
+    setFocusedIndex(null);
+  };
+
+  // Drag handlers for card reordering
+  const handleCardDragStart = (e: React.MouseEvent, shotId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragShotId(shotId);
+  };
+
+  const handleCardDrag = useCallback((e: MouseEvent) => {
+    if (!dragShotId || !containerRef.current) return;
+    
+    // Find which card we're hovering over
+    const elements = document.elementsFromPoint(e.clientX, e.clientY);
+    const targetCard = elements.find(el => el.hasAttribute('data-card'));
+    
+    if (targetCard) {
+      const targetShotId = targetCard.getAttribute('data-shot-id');
+      if (targetShotId && targetShotId !== dragShotId) {
+        const dragShot = shots.find(s => s.id === dragShotId);
+        const targetShot = shots.find(s => s.id === targetShotId);
+        
+        // Only reorder if same scene
+        if (dragShot && targetShot && dragShot.sceneId === targetShot.sceneId) {
+          const currentOrder = sortedShots.map(s => s.id);
+          const dragIndex = currentOrder.indexOf(dragShotId);
+          const targetIndex = currentOrder.indexOf(targetShotId);
+          
+          if (dragIndex !== -1 && targetIndex !== -1) {
+            const newOrder = [...currentOrder];
+            newOrder.splice(dragIndex, 1);
+            newOrder.splice(targetIndex, 0, dragShotId);
+            reorderShots(newOrder);
+          }
+        }
+      }
+    }
+  }, [dragShotId, shots, sortedShots, reorderShots]);
+
+  const handleCardDragEnd = useCallback(() => {
+    setDragShotId(null);
+  }, []);
+
+  // Global mouse handlers for drag
+  useEffect(() => {
+    if (dragShotId) {
+      window.addEventListener('mousemove', handleCardDrag);
+      window.addEventListener('mouseup', handleCardDragEnd);
+      return () => {
+        window.removeEventListener('mousemove', handleCardDrag);
+        window.removeEventListener('mouseup', handleCardDragEnd);
+      };
+    }
+  }, [dragShotId, handleCardDrag, handleCardDragEnd]);
+
+  // Get dragging shot's scene for dimming
+  const draggingShot = dragShotId ? shots.find(s => s.id === dragShotId) : null;
+  const draggingSceneId = draggingShot?.sceneId;
+
+  const handleBatchDelete = () => {
+    if (selectedShots.size === 0) return;
+    if (confirm(`Delete ${selectedShots.size} selected shot(s)?`)) {
+      selectedShots.forEach((id) => deleteShot(id, false)); // Don't ask about scene deletion for batch
+      setSelectedShots(new Set());
+    }
+  };
+
+  const handleBatchSceneChange = (sceneId: string) => {
+    if (selectedShots.size === 0) return;
+    bulkUpdateShots(Array.from(selectedShots), { sceneId: sceneId || undefined });
+    setSelectedShots(new Set());
+  };
+
+  // Sort scenes for dropdown
+  const sortedScenes = useMemo(() => {
+    return [...scenes].sort((a, b) => {
+      const numA = parseInt(a.sceneNumber, 10) || 0;
+      const numB = parseInt(b.sceneNumber, 10) || 0;
+      return numA - numB;
+    });
+  }, [scenes]);
 
   const handleMoveSelected = (direction: 'up' | 'down') => {
     if (focusedIndex === null || selectedShots.size === 0) return;
@@ -135,7 +415,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
     const newOrder = [...currentOrder];
     
     if (direction === 'up') {
-      // Find the minimum index of selected items
+      // Move selected group up: find min index, remove all, insert one position earlier
       const minIndex = Math.min(...selectedIds.map(id => newOrder.indexOf(id)));
       if (minIndex > 0) {
         // Remove all selected items
@@ -218,38 +498,80 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   }, [focusedIndex, sortedShots, selectedShots]);
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-50">
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => createShot()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
-          >
-            + Add Shot
-          </button>
-          <button
-            onClick={() => createScene()}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm font-medium"
-          >
-            + Add Scene
-          </button>
+    <div className="w-full h-full flex flex-col bg-slate-900">
+      <div 
+        className="p-2 sm:p-4 border-b border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 bg-slate-800"
+        onClick={handleTopBarClick}
+      >
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
+          {selectedShots.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs sm:text-sm text-slate-400">{selectedShots.size} selected</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleMoveSelected('up')}
+                  className="p-1 text-slate-400 hover:text-slate-300"
+                  title="Move up (Cmd/Ctrl+↑)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleMoveSelected('down')}
+                  className="p-1 text-slate-400 hover:text-slate-300"
+                  title="Move down (Cmd/Ctrl+↓)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+              <select
+                onChange={(e) => {
+                  if (e.target.value.startsWith('scene:')) {
+                    handleBatchSceneChange(e.target.value.split(':')[1]);
+                  }
+                  e.target.value = '';
+                }}
+                className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm"
+                defaultValue=""
+              >
+                <option value="">Move to scene...</option>
+                <option value="scene:">Unassigned</option>
+                {sortedScenes.map((s) => (
+                  <option key={s.id} value={`scene:${s.id}`}>
+                    {s.sceneNumber}: {s.title || `Scene ${s.sceneNumber}`}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleBatchDelete}
+                className="px-2 sm:px-3 py-1 text-red-500 hover:bg-red-900/30 rounded text-xs sm:text-sm border border-red-600 hover:border-red-500 flex items-center gap-1"
+                title="Delete selected"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span className="hidden sm:inline">Delete</span>
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
           <button
             onClick={() => setLayout(layout === 'grid' ? 'list' : 'grid')}
-            className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100"
+            className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm hover:bg-slate-700"
           >
             {layout === 'grid' ? 'List' : 'Grid'}
           </button>
           <button
             onClick={() => setDensity(density === 'compact' ? 'detailed' : 'compact')}
-            className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100"
+            className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm hover:bg-slate-700"
           >
-            {density === 'compact' ? 'Detailed' : 'Compact'}
+            {density === 'compact' ? 'Compact' : 'Detailed'}
           </button>
-          {selectedShots.size > 0 && (
-            <span className="text-sm text-gray-600">{selectedShots.size} selected</span>
-          )}
         </div>
-        <div className="text-sm text-gray-600">{sortedShots.length} shots</div>
       </div>
 
       <input
@@ -268,11 +590,12 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
 
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto p-4 focus:outline-none"
+        className="flex-1 overflow-auto p-2 sm:p-4 focus:outline-none"
         tabIndex={0}
+        onClick={handleContainerClick}
       >
         <div
-          className={layout === 'grid' ? 'grid grid-cols-3 gap-4' : 'flex flex-col gap-4'}
+          className={layout === 'grid' ? `grid grid-cols-1 sm:grid-cols-2 ${density === 'compact' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-2 sm:gap-4` : 'flex flex-col gap-2 sm:gap-4'}
         >
           {sortedShots.map((shot, index) => {
             const shotFrames = getShotFrames(shot.id);
@@ -285,13 +608,19 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
             return (
               <div
                 key={shot.id}
-                className={`bg-white rounded-lg border-2 ${
+                data-card
+                data-shot-id={shot.id}
+                draggable
+                onDragStart={(e) => handleCardDragStart(e, shot.id)}
+                className={`rounded-lg border-2 cursor-move ${
                   isSelected
-                    ? 'border-blue-400 shadow-md'
-                    : 'border-gray-200'
-                } ${isFocused ? 'ring-2 ring-blue-300' : ''} ${
-                  density === 'compact' ? 'p-2' : 'p-4'
-                } transition-all`}
+                    ? 'bg-slate-700 border-slate-400 shadow-md'
+                    : 'bg-slate-800 border-slate-600'
+                } ${isFocused ? 'ring-2 ring-slate-400' : ''} ${
+                  density === 'compact' ? 'p-2' : 'p-2 sm:p-4'
+                } transition-all ${
+                  dragShotId && shot.sceneId !== draggingSceneId ? 'opacity-30' : ''
+                } ${dragShotId === shot.id ? 'opacity-50' : ''}`}
                 onClick={(e) => handleCardClick(e, shot.id, index)}
               >
                 <div className="flex items-start justify-between mb-2">
@@ -303,7 +632,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                           handleMoveShot(shot.id, 'up');
                         }}
                         disabled={!canMoveUp}
-                        className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="p-0.5 text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Move up"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -316,7 +645,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                           handleMoveShot(shot.id, 'down');
                         }}
                         disabled={!canMoveDown}
-                        className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="p-0.5 text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Move down"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -324,9 +653,9 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                         </svg>
                       </button>
                     </div>
-                              <span className="font-semibold text-sm text-gray-900">{shot.shotCode}</span>
+                              <span className="font-semibold text-sm text-slate-100">{shot.shotCode}</span>
                               {sceneName && (
-                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                <span className="text-xs text-slate-400 bg-slate-700 px-2 py-0.5 rounded">
                                   {sceneName}
                                 </span>
                               )}
@@ -337,7 +666,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                             <div
                               className={`image-area ${
                                 density === 'compact' ? 'h-24' : 'h-48'
-                              } border border-gray-200 rounded bg-gray-50 flex items-center justify-center relative cursor-pointer`}
+                              } border border-slate-600 rounded bg-slate-900 flex items-center justify-center relative cursor-pointer`}
                               onDrop={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -351,7 +680,13 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleImageUpload(shot.id);
+                                try {
+                                  if (shot.id) {
+                                    handleImageUpload(shot.id);
+                                  }
+                                } catch (error) {
+                                  console.error('Error handling image upload click:', error);
+                                }
                               }}
                             >
                               {shotFrames.length > 0 ? (
@@ -368,7 +703,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                                   )}
                                 </>
                               ) : (
-                                <div className="text-center text-gray-400 text-sm">
+                                <div className="text-center text-slate-500 text-sm">
                                   Drop image here or click to upload
                                 </div>
                               )}
@@ -386,7 +721,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                                       return newMap;
                                     });
                                   }}
-                                  className="p-0.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+                                  className="p-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
                                   title="Previous image"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -404,7 +739,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                                       return newMap;
                                     });
                                   }}
-                                  className="p-0.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+                                  className="p-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
                                   title="Next image"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -416,7 +751,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                           </div>
 
                           {density === 'detailed' && shot.scriptText && (
-                            <div className="text-xs text-gray-600 mb-2 line-clamp-2">{shot.scriptText}</div>
+                            <div className="text-xs text-slate-400 mb-2 line-clamp-2">{shot.scriptText}</div>
                           )}
                         </div>
                     );

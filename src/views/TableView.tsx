@@ -13,6 +13,7 @@ export function TableView({ onSelect }: TableViewProps) {
   const createShot = useStore((state) => state.createShot);
   const updateShot = useStore((state) => state.updateShot);
   const deleteShot = useStore((state) => state.deleteShot);
+  const deleteScene = useStore((state) => state.deleteScene);
   const bulkUpdateShots = useStore((state) => state.bulkUpdateShots);
   const reorderShots = useStore((state) => state.reorderShots);
   const createScene = useStore((state) => state.createScene);
@@ -25,8 +26,10 @@ export function TableView({ onSelect }: TableViewProps) {
   const [compactMode, setCompactMode] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState<Map<string, number>>(new Map());
   const [hoverPreview, setHoverPreview] = useState<{ image: string; x: number; y: number } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ shotId: string; sceneName: string; isLastShot: boolean } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const generalNotesTextareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sort scenes by sceneNumber (low to high)
@@ -118,6 +121,7 @@ export function TableView({ onSelect }: TableViewProps) {
   }, []);
 
   const handleCellKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    // Enter saves, Shift+Enter newline, Escape cancels
     if (e.key === 'Enter' && !e.shiftKey) {
       (e.currentTarget as HTMLElement).blur();
     } else if (e.key === 'Escape') {
@@ -126,15 +130,60 @@ export function TableView({ onSelect }: TableViewProps) {
     }
   }, []);
 
-  const handleAddRow = () => {
-    // createShot will automatically assign to scene 0 if no sceneId provided
-    createShot();
+  const handleDeleteRow = (shotId: string) => {
+    const shot = shots.find(s => s.id === shotId);
+    if (!shot) return;
+
+    // Check if this is the last shot in the scene
+    if (shot.sceneId) {
+      const sceneShots = shots.filter(s => s.sceneId === shot.sceneId);
+      if (sceneShots.length === 1) {
+        // This is the last shot - show 3-option dialog
+        const scene = scenes.find(s => s.id === shot.sceneId);
+        if (scene) {
+          const sceneName = scene.title && scene.title.trim() 
+            ? `${scene.sceneNumber}: ${scene.title}`
+            : `Scene ${scene.sceneNumber}`;
+          setDeleteDialog({ shotId, sceneName, isLastShot: true });
+          return;
+        }
+      }
+    }
+
+    // Not the last shot - show simple confirmation
+    if (confirm('Delete this shot?')) {
+      deleteShot(shotId, false); // Pass false to skip the scene deletion check
+    }
   };
 
-  const handleDeleteRow = (shotId: string) => {
-    if (confirm('Delete this shot?')) {
-      deleteShot(shotId);
+  const handleDeleteConfirm = (choice: 'row-only' | 'row-and-scene' | 'cancel') => {
+    if (!deleteDialog) return;
+
+    if (choice === 'cancel') {
+      setDeleteDialog(null);
+      return;
     }
+
+    const shot = shots.find(s => s.id === deleteDialog.shotId);
+    if (!shot) {
+      setDeleteDialog(null);
+      return;
+    }
+
+    if (choice === 'row-only') {
+      // Delete row only
+      deleteShot(deleteDialog.shotId, false);
+    } else if (choice === 'row-and-scene') {
+      // Delete row and scene
+      if (shot.sceneId) {
+        deleteShot(deleteDialog.shotId, false);
+        deleteScene(shot.sceneId);
+      } else {
+        deleteShot(deleteDialog.shotId, false);
+      }
+    }
+
+    setDeleteDialog(null);
   };
 
   const handleBatchDelete = () => {
@@ -151,6 +200,7 @@ export function TableView({ onSelect }: TableViewProps) {
     setSelectedRows(new Set());
   };
 
+  // Move multiple selected shots as a group
   const handleBatchMove = (direction: 'up' | 'down') => {
     if (selectedRows.size === 0) return;
     const selectedIds = Array.from(selectedRows);
@@ -160,6 +210,7 @@ export function TableView({ onSelect }: TableViewProps) {
     if (direction === 'up') {
       const minIndex = Math.min(...selectedIds.map(id => newOrder.indexOf(id)));
       if (minIndex > 0) {
+        // Remove all, insert one position earlier
         selectedIds.forEach(id => {
           const idx = newOrder.indexOf(id);
           if (idx !== -1) newOrder.splice(idx, 1);
@@ -172,6 +223,7 @@ export function TableView({ onSelect }: TableViewProps) {
     } else {
       const maxIndex = Math.max(...selectedIds.map(id => newOrder.indexOf(id)));
       if (maxIndex < newOrder.length - 1) {
+        // Remove all, insert one position later
         selectedIds.forEach(id => {
           const idx = newOrder.indexOf(id);
           if (idx !== -1) newOrder.splice(idx, 1);
@@ -186,7 +238,20 @@ export function TableView({ onSelect }: TableViewProps) {
   };
 
   const handleAddRowToScene = (sceneId?: string) => {
-    createShot(sceneId);
+    const shotId = createShot(sceneId);
+    // Scroll to the new shot after a brief delay to allow DOM update
+    setTimeout(() => {
+      const element = document.querySelector(`[data-shot-id="${shotId}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        // If shot not found, scroll to scene header
+        const sceneElement = document.querySelector(`[data-scene-id="${sceneId}"]`);
+        if (sceneElement) {
+          sceneElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }, 100);
   };
 
 
@@ -262,7 +327,20 @@ export function TableView({ onSelect }: TableViewProps) {
     if (editingCell) {
       if (editingCell.field === 'scriptText' && textareaRef.current) {
         textareaRef.current.focus();
-        // Don't select all - let user type normally
+        // Trigger auto-resize on focus
+        const textarea = textareaRef.current;
+        textarea.style.height = 'auto';
+        const minHeight = 64;
+        const newHeight = Math.max(minHeight, textarea.scrollHeight);
+        textarea.style.height = `${newHeight}px`;
+      } else if (editingCell.field === 'generalNotes' && generalNotesTextareaRef.current) {
+        generalNotesTextareaRef.current.focus();
+        // Trigger auto-resize on focus
+        const textarea = generalNotesTextareaRef.current;
+        textarea.style.height = 'auto';
+        const minHeight = 64;
+        const newHeight = Math.max(minHeight, textarea.scrollHeight);
+        textarea.style.height = `${newHeight}px`;
       } else if (inputRef.current) {
         inputRef.current.focus();
         // Don't select all - let user type normally
@@ -288,28 +366,31 @@ export function TableView({ onSelect }: TableViewProps) {
   }, [selectedRows, sortedShots]);
 
   return (
-    <div className="w-full h-full flex flex-col bg-white">
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="w-full h-full flex flex-col bg-slate-900">
+      <div className="p-2 sm:p-4 border-b border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
           <button
-            onClick={handleAddRow}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
-          >
-            + Add Row
-          </button>
-          <button
-            onClick={() => createScene()}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm font-medium"
+            onClick={() => {
+              const sceneId = createScene();
+              // Scroll to the new scene after a brief delay to allow DOM update
+              setTimeout(() => {
+                const element = document.querySelector(`[data-scene-id="${sceneId}"]`);
+                if (element) {
+                  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }, 100);
+            }}
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 text-xs sm:text-sm font-medium"
           >
             + Add Scene
           </button>
           {selectedRows.size > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">{selectedRows.size} selected</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs sm:text-sm text-slate-400">{selectedRows.size} selected</span>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => handleBatchMove('up')}
-                  className="p-1 text-gray-400 hover:text-gray-600"
+                  className="p-1 text-slate-400 hover:text-slate-300"
                   title="Move up (Cmd/Ctrl+↑)"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -318,7 +399,7 @@ export function TableView({ onSelect }: TableViewProps) {
                 </button>
                 <button
                   onClick={() => handleBatchMove('down')}
-                  className="p-1 text-gray-400 hover:text-gray-600"
+                  className="p-1 text-slate-400 hover:text-slate-300"
                   title="Move down (Cmd/Ctrl+↓)"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -333,20 +414,20 @@ export function TableView({ onSelect }: TableViewProps) {
                   }
                   e.target.value = '';
                 }}
-                className="px-3 py-1 border border-gray-300 rounded text-sm"
+                className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm"
                 defaultValue=""
               >
                 <option value="">Move to scene...</option>
                 <option value="scene:">Unassigned</option>
                 {sortedScenes.map((s) => (
                   <option key={s.id} value={`scene:${s.id}`}>
-                    {s.sceneNumber}: {s.title}
+                    {s.sceneNumber}: {s.title || `Scene ${s.sceneNumber}`}
                   </option>
                 ))}
               </select>
               <button
                 onClick={handleBatchDelete}
-                className="px-3 py-1 text-red-600 hover:bg-red-50 rounded text-sm border border-red-300 hover:border-red-400 flex items-center gap-1"
+                className="px-2 sm:px-3 py-1 text-red-500 hover:bg-red-900/30 rounded text-xs sm:text-sm border border-red-600 hover:border-red-500 flex items-center gap-1"
                 title="Delete selected"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -357,14 +438,12 @@ export function TableView({ onSelect }: TableViewProps) {
             </div>
           )}
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={compactMode}
-            onChange={(e) => setCompactMode(e.target.checked)}
-          />
-          Compact Mode
-        </label>
+        <button
+          onClick={() => setCompactMode(!compactMode)}
+          className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm hover:bg-slate-700"
+        >
+          {compactMode ? 'Detailed' : 'Compact'}
+        </button>
       </div>
 
       <input
@@ -394,7 +473,7 @@ export function TableView({ onSelect }: TableViewProps) {
           <img
             src={hoverPreview.image}
             alt="Preview"
-            className="max-w-md max-h-md border-2 border-gray-300 rounded shadow-2xl"
+            className="max-w-md max-h-md border-2 border-slate-600 rounded shadow-2xl"
             style={{ maxWidth: '400px', maxHeight: '400px', objectFit: 'contain' }}
           />
         </div>
@@ -402,15 +481,15 @@ export function TableView({ onSelect }: TableViewProps) {
 
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse">
-          <thead className="bg-gray-50 sticky top-0 z-10">
+          <thead className="bg-slate-800 sticky top-0 z-10">
             <tr>
-              {!compactMode && <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 w-8"></th>}
-              {!compactMode && <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 w-8"></th>}
-              <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 w-20">Shot</th>
-              <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 w-24">Thumbnail</th>
-              <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700">Script</th>
-              <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700">General Notes</th>
-              {!compactMode && <th className="p-2 border-b border-gray-200 text-left text-xs font-semibold text-gray-700 w-20">Actions</th>}
+              {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
+              {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
+              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20 uppercase">Shot</th>
+              <th className="p-2 border-b border-slate-700 text-center text-xs font-semibold text-slate-400 w-24 uppercase">Thumbnail</th>
+              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">Script</th>
+              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">General Notes</th>
+              {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20"></th>}
             </tr>
           </thead>
           <tbody>
@@ -436,12 +515,12 @@ export function TableView({ onSelect }: TableViewProps) {
                         const isUnassigned = sceneId === 'unassigned';
                         return (
                           <React.Fragment key={sceneId}>
-                            <tr className="bg-gray-100">
-                              <td colSpan={compactMode ? 4 : 6} className="p-3">
+                            <tr className="bg-slate-800" data-scene-id={sceneId}>
+                              <td colSpan={compactMode ? 4 : 7} className="p-3">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     {isUnassigned ? (
-                                      <span className="font-semibold text-sm text-gray-700">Unassigned</span>
+                                      <span className="font-semibold text-sm text-slate-200">Unassigned</span>
                                     ) : (
                                       <input
                                     type="text"
@@ -475,19 +554,19 @@ export function TableView({ onSelect }: TableViewProps) {
                                         e.currentTarget.blur();
                                       }
                                     }}
-                                    className="font-semibold text-sm text-gray-700 bg-transparent border-b border-gray-400 focus:outline-none focus:border-blue-500"
+                                    className="font-semibold text-sm text-slate-200 bg-transparent border-b border-slate-500 focus:outline-none focus:border-slate-400"
                                     placeholder={`Scene ${scene?.sceneNumber}`}
                                   />
                                     )}
-                                    <span className="text-xs text-gray-500">
+                                    <span className="text-xs text-slate-400">
                                       ({sceneShots.length} shots)
                                     </span>
                                   </div>
                                   <button
                                     onClick={() => handleAddRowToScene(isUnassigned ? undefined : sceneId)}
-                                    className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                    className="px-2 py-1 text-xs bg-slate-600 text-white rounded hover:bg-slate-700"
                                   >
-                                    + Add Row
+                                    + Add Shot
                                   </button>
                                 </div>
                               </td>
@@ -505,6 +584,7 @@ export function TableView({ onSelect }: TableViewProps) {
                                   editingCell={editingCell}
                                   inputRef={inputRef}
                                   textareaRef={textareaRef}
+                                  generalNotesTextareaRef={generalNotesTextareaRef}
                                   isSelected={selectedRows.has(shot.id)}
                                   isDragging={false}
                                   currentImageIndex={currentImageIndex.get(shot.id) || 0}
@@ -514,7 +594,13 @@ export function TableView({ onSelect }: TableViewProps) {
                                   onCellBlur={handleCellBlur}
                                   onCellKeyDown={handleCellKeyDown}
                                   onCellChange={handleCellChange}
-                                  onSelect={() => onSelect(shot.id, 'shot')}
+                                  onSelect={() => {
+                                    try {
+                                      onSelect(shot.id, 'shot');
+                                    } catch (error) {
+                                      console.error('Error selecting shot in TableView:', error);
+                                    }
+                                  }}
                                   onDelete={() => handleDeleteRow(shot.id)}
                                   onToggleSelect={(id) => {
                                     const newSelected = new Set(selectedRows);
@@ -540,17 +626,58 @@ export function TableView({ onSelect }: TableViewProps) {
                 </tbody>
           </table>
       </div>
+
+      {/* Delete Dialog Modal */}
+      {deleteDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg shadow-xl w-96 modal-content">
+            <div className="p-4 border-b border-slate-700">
+              <h3 className="text-lg font-semibold text-slate-100">Delete Shot</h3>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-slate-300 mb-4">
+                This is the last shot in {deleteDialog.sceneName}.
+              </p>
+              <p className="text-sm text-slate-400 mb-4">
+                What would you like to do?
+              </p>
+            </div>
+            <div className="p-4 border-t border-slate-700 flex flex-col gap-2">
+              <button
+                onClick={() => handleDeleteConfirm('row-only')}
+                className="w-full px-4 py-2 text-sm text-white bg-slate-600 hover:bg-slate-700 rounded"
+              >
+                Delete row only
+              </button>
+              <button
+                onClick={() => handleDeleteConfirm('row-and-scene')}
+                className="w-full px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded"
+              >
+                Delete row and scene
+              </button>
+              <button
+                onClick={() => handleDeleteConfirm('cancel')}
+                className="w-full px-4 py-2 text-sm text-slate-200 bg-slate-700 hover:bg-slate-600 rounded"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 interface ShotRowProps {
+  'data-shot-id'?: string;
   shot: Shot;
   frames: any[];
   selectedCell: { rowId: string; field: string } | null;
   editingCell: { rowId: string; field: string; value: string } | null;
   inputRef: React.RefObject<HTMLInputElement>;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
+  generalNotesTextareaRef: React.RefObject<HTMLTextAreaElement>;
   isSelected: boolean;
   isDragging: boolean;
   currentImageIndex: number;
@@ -570,6 +697,72 @@ interface ShotRowProps {
   onMoveDown: () => void;
   compactMode: boolean;
 }
+
+// Auto-resizing textarea component
+const AutoResizeTextarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  ({ value, onChange, ...props }, ref) => {
+    const internalRef = useRef<HTMLTextAreaElement | null>(null);
+    
+    // Combine internal ref with forwarded ref
+    const combinedRef = (node: HTMLTextAreaElement | null) => {
+      internalRef.current = node;
+      if (typeof ref === 'function') {
+        ref(node);
+      } else if (ref && 'current' in ref) {
+        (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = node;
+      }
+    };
+
+    const adjustHeight = () => {
+      const textarea = internalRef.current;
+      if (textarea) {
+        // Reset height to auto to get the correct scrollHeight
+        textarea.style.height = 'auto';
+        // Set height based on scrollHeight, with minimum of 4rem
+        const minHeight = 64; // 4rem in pixels
+        const newHeight = Math.max(minHeight, textarea.scrollHeight);
+        textarea.style.height = `${newHeight}px`;
+      }
+    };
+
+    useEffect(() => {
+      adjustHeight();
+    }, [value]);
+
+    // Also adjust on mount
+    useEffect(() => {
+      const textarea = internalRef.current;
+      if (textarea) {
+        // Small delay to ensure DOM is ready
+        setTimeout(adjustHeight, 0);
+      }
+    }, []);
+
+    return (
+      <textarea
+        ref={combinedRef}
+        value={value}
+        onChange={(e) => {
+          if (onChange) {
+            onChange(e);
+          }
+          // Adjust height after value changes
+          setTimeout(() => {
+            const textarea = internalRef.current;
+            if (textarea) {
+              textarea.style.height = 'auto';
+              const minHeight = 64;
+              const newHeight = Math.max(minHeight, textarea.scrollHeight);
+              textarea.style.height = `${newHeight}px`;
+            }
+          }, 0);
+        }}
+        {...props}
+      />
+    );
+  }
+);
+AutoResizeTextarea.displayName = 'AutoResizeTextarea';
 
 interface ImageThumbnailProps {
   frames: any[];
@@ -591,6 +784,7 @@ const ImageThumbnail = React.memo(function ImageThumbnail({
   const hoverTimeoutRef = React.useRef<number | null>(null);
   const isPreviewShowingRef = React.useRef(false);
 
+  // Show preview after 800ms hover delay
   const handleMouseEnter = (e: React.MouseEvent) => {
     hoverTimeoutRef.current = window.setTimeout(() => {
       isPreviewShowingRef.current = true;
@@ -623,7 +817,7 @@ const ImageThumbnail = React.memo(function ImageThumbnail({
             const newIndex = currentImageIndex > 0 ? currentImageIndex - 1 : frames.length - 1;
             onImageIndexChange(shotId, newIndex);
           }}
-          className="p-0.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+          className="p-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
           onMouseDown={(e) => e.stopPropagation()}
           title="Previous image"
         >
@@ -645,7 +839,7 @@ const ImageThumbnail = React.memo(function ImageThumbnail({
         <img
           src={frames[currentImageIndex]?.image || frames[0]?.image}
           alt=""
-          className="w-full h-full object-cover rounded border border-gray-300"
+          className="w-full h-full object-cover rounded border border-slate-600"
         />
         {frames.length > 1 && (
           <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs text-center py-0.5 font-semibold">
@@ -660,7 +854,7 @@ const ImageThumbnail = React.memo(function ImageThumbnail({
             const newIndex = currentImageIndex < frames.length - 1 ? currentImageIndex + 1 : 0;
             onImageIndexChange(shotId, newIndex);
           }}
-          className="p-0.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700"
+          className="p-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
           onMouseDown={(e) => e.stopPropagation()}
           title="Next image"
         >
@@ -680,6 +874,7 @@ const ShotRow = React.memo(function ShotRow({
   editingCell,
   inputRef,
   textareaRef,
+  generalNotesTextareaRef,
   isSelected,
   isDragging,
   currentImageIndex,
@@ -704,10 +899,11 @@ const ShotRow = React.memo(function ShotRow({
 
   const renderCell = (field: string, value: any, renderFn?: () => React.ReactNode) => {
     if (isEditing && editingCell?.field === field) {
-      if (field === 'scriptText') {
+      if (field === 'scriptText' || field === 'generalNotes') {
+        const textareaRefToUse = field === 'scriptText' ? textareaRef : generalNotesTextareaRef;
         return (
-          <textarea
-            ref={textareaRef}
+          <AutoResizeTextarea
+            ref={textareaRefToUse}
             value={editingCell.value}
             onChange={(e) => {
               e.stopPropagation();
@@ -727,8 +923,17 @@ const ShotRow = React.memo(function ShotRow({
             }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-            className="w-full px-2 py-1 border border-blue-500 rounded text-sm focus:outline-none resize-none"
-            rows={3}
+            className="border border-slate-500 bg-slate-900 text-white rounded text-xs focus:outline-none resize-none"
+            style={{ 
+              minHeight: '4rem',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              display: 'block',
+              padding: '0.5rem',
+              margin: 0,
+              overflow: 'hidden'
+            }}
           />
         );
       }
@@ -755,7 +960,7 @@ const ShotRow = React.memo(function ShotRow({
           }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
-          className="w-full px-2 py-1 border border-blue-500 rounded text-sm focus:outline-none"
+          className="w-full px-2 py-1 border border-slate-500 bg-slate-900 text-white rounded text-xs focus:outline-none"
         />
       );
     }
@@ -764,31 +969,39 @@ const ShotRow = React.memo(function ShotRow({
     }
     return (
       <div
-        className={`px-2 py-1 cursor-text hover:bg-gray-50 rounded ${cellSelected && selectedCell?.field === field ? 'bg-blue-50' : ''}`}
+        className={`px-2 py-1 cursor-text hover:bg-slate-800 rounded text-xs ${cellSelected && selectedCell?.field === field ? 'bg-slate-700/50' : ''}`}
         onClick={() => onCellClick(shot.id, field, value)}
       >
-        {value || <span className="text-gray-400">Click to edit</span>}
+        {value || <span className="text-slate-500 text-xs">Click to edit</span>}
       </div>
     );
   };
 
   return (
     <tr
-      className={`hover:bg-gray-50 ${isDragging ? 'opacity-50' : ''} ${isSelected ? 'bg-blue-50' : ''} ${compactMode ? 'h-8' : ''}`}
+      data-shot-id={shot.id}
+      className={`hover:bg-slate-800 ${isDragging ? 'opacity-50' : ''} ${isSelected ? 'bg-slate-700/50' : ''} ${compactMode ? 'h-8' : ''}`}
     >
       {!compactMode && (
-        <td className="p-2 border-b border-gray-100">
+        <td className="p-2 border-b border-slate-700">
           <input
             type="checkbox"
             checked={isSelected}
             onChange={() => onToggleSelect(shot.id)}
             onClick={(e) => e.stopPropagation()}
-            className="cursor-pointer"
+            className="cursor-pointer rounded-none border border-slate-600"
+            style={{
+              borderRadius: 0,
+              accentColor: 'white',
+              width: '1rem',
+              height: '1rem',
+              borderWidth: '1px'
+            }}
           />
         </td>
       )}
       {!compactMode && (
-        <td className="p-2 border-b border-gray-100">
+        <td className="p-2 border-b border-slate-700">
           <div className="flex flex-col gap-0.5">
             <button
               onClick={(e) => {
@@ -796,7 +1009,7 @@ const ShotRow = React.memo(function ShotRow({
                 onMoveUp();
               }}
               disabled={!canMoveUp}
-              className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-0.5 text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
               title="Move up"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -809,7 +1022,7 @@ const ShotRow = React.memo(function ShotRow({
                 onMoveDown();
               }}
               disabled={!canMoveDown}
-              className="p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-0.5 text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
               title="Move down"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -819,60 +1032,70 @@ const ShotRow = React.memo(function ShotRow({
           </div>
         </td>
       )}
-      <td className={`border-b border-gray-100 ${compactMode ? 'p-1' : 'p-2'}`}>
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'}`}>
         {renderCell('shotCode', shot.shotCode)}
       </td>
-      <td className={`border-b border-gray-100 ${compactMode ? 'p-1' : 'p-2'}`}>
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} text-center`}>
         {frames.length > 0 ? (
-          <ImageThumbnail
-            frames={frames}
-            currentImageIndex={currentImageIndex}
-            shotId={shot.id}
-            onThumbnailClick={onThumbnailClick}
-            onImageIndexChange={onImageIndexChange}
-            onImageHover={onImageHover}
-          />
+          <div className="flex justify-center">
+            <ImageThumbnail
+              frames={frames}
+              currentImageIndex={currentImageIndex}
+              shotId={shot.id}
+              onThumbnailClick={onThumbnailClick}
+              onImageIndexChange={onImageIndexChange}
+              onImageHover={onImageHover}
+            />
+          </div>
         ) : (
           <div
-            className="w-16 h-10 bg-gray-100 rounded border border-gray-300 flex items-center justify-center text-xs text-gray-400 cursor-pointer hover:bg-gray-200"
+            className="w-16 h-10 bg-slate-800 rounded border border-slate-600 flex items-center justify-center text-xs text-slate-500 cursor-pointer hover:bg-slate-700 mx-auto"
             onClick={(e) => {
               e.stopPropagation();
               onThumbnailClick();
             }}
           >
-            No image
+            Image
           </div>
         )}
       </td>
-      <td className={`border-b border-gray-100 ${compactMode ? 'p-1' : 'p-2'}`}>
-        {renderCell('scriptText', shot.scriptText, () => (
-          <div
-            className={`px-2 py-1 cursor-text hover:bg-gray-50 rounded ${compactMode ? 'min-h-[1rem]' : 'min-h-[2rem]'} ${cellSelected && selectedCell?.field === 'scriptText' ? 'bg-blue-50' : ''}`}
-            onClick={() => onCellClick(shot.id, 'scriptText', shot.scriptText)}
-          >
-            {shot.scriptText || <span className="text-gray-400">Click to edit</span>}
-          </div>
-        ))}
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'}`} style={{ width: '30%', minWidth: '200px' }}>
+        <div style={{ width: '100%' }}>
+          {renderCell('scriptText', shot.scriptText, () => (
+            <div
+              className={`px-2 py-1 cursor-text hover:bg-slate-800 rounded text-xs ${compactMode ? 'min-h-[1rem]' : 'min-h-[2rem]'} ${cellSelected && selectedCell?.field === 'scriptText' ? 'bg-slate-700/50' : ''}`}
+              onClick={() => onCellClick(shot.id, 'scriptText', shot.scriptText)}
+            >
+              {shot.scriptText || <span className="text-slate-500 text-xs">Click to edit</span>}
+            </div>
+          ))}
+        </div>
       </td>
-      <td className={`border-b border-gray-100 ${compactMode ? 'p-1' : 'p-2'}`}>
-        {renderCell('generalNotes', shot.generalNotes, () => (
-          <div
-            className={`px-2 py-1 cursor-text hover:bg-gray-50 rounded ${compactMode ? 'min-h-[1rem]' : 'min-h-[2rem]'} ${cellSelected && selectedCell?.field === 'generalNotes' ? 'bg-blue-50' : ''}`}
-            onClick={() => onCellClick(shot.id, 'generalNotes', shot.generalNotes)}
-          >
-            {shot.generalNotes || <span className="text-gray-400">Click to edit</span>}
-          </div>
-        ))}
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'}`} style={{ width: '30%', minWidth: '200px' }}>
+        <div style={{ width: '100%' }}>
+          {renderCell('generalNotes', shot.generalNotes, () => (
+            <div
+              className={`px-2 py-1 cursor-text hover:bg-slate-800 rounded text-xs ${compactMode ? 'min-h-[1rem]' : 'min-h-[2rem]'} ${cellSelected && selectedCell?.field === 'generalNotes' ? 'bg-slate-700/50' : ''}`}
+              onClick={() => onCellClick(shot.id, 'generalNotes', shot.generalNotes)}
+            >
+              {shot.generalNotes || <span className="text-slate-500 text-xs">Click to edit</span>}
+            </div>
+          ))}
+        </div>
       </td>
       {!compactMode && (
-        <td className="p-2 border-b border-gray-100">
+        <td className="p-2 border-b border-slate-700">
           <div className="flex items-center gap-2">
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onSelect();
+                try {
+                  onSelect();
+                } catch (error) {
+                  console.error('Error in onSelect callback:', error);
+                }
               }}
-              className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
+              className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded"
               title="View details"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -884,7 +1107,7 @@ const ShotRow = React.memo(function ShotRow({
                 e.stopPropagation();
                 onDelete();
               }}
-              className="p-1 text-red-600 hover:bg-red-50 rounded"
+              className="p-1 text-red-500 hover:bg-red-900/30 rounded"
               title="Delete"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
