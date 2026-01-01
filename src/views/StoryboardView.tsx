@@ -320,6 +320,13 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
     setFocusedIndex(null);
   };
 
+  const handleTopBarClick = (e: React.MouseEvent) => {
+    // Allow dismissing selection by clicking empty area in top bars
+    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('select')) return;
+    setSelectedShots(new Set());
+    setFocusedIndex(null);
+  };
+
   // Drag handlers for card reordering
   const handleCardDragStart = (e: React.MouseEvent, shotId: string) => {
     e.preventDefault();
@@ -492,7 +499,10 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-900">
-      <div className="p-2 sm:p-4 border-b border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 bg-slate-800">
+      <div 
+        className="p-2 sm:p-4 border-b border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 bg-slate-800"
+        onClick={handleTopBarClick}
+      >
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
           {selectedShots.size > 0 && (
             <div className="flex flex-wrap items-center gap-2">
@@ -602,10 +612,10 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                 data-shot-id={shot.id}
                 draggable
                 onDragStart={(e) => handleCardDragStart(e, shot.id)}
-                className={`bg-slate-800 rounded-lg border-2 cursor-move ${
+                className={`rounded-lg border-2 cursor-move ${
                   isSelected
-                    ? 'border-slate-400 shadow-md'
-                    : 'border-slate-600'
+                    ? 'bg-slate-700 border-slate-400 shadow-md'
+                    : 'bg-slate-800 border-slate-600'
                 } ${isFocused ? 'ring-2 ring-slate-400' : ''} ${
                   density === 'compact' ? 'p-2' : 'p-2 sm:p-4'
                 } transition-all ${

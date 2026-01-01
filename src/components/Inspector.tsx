@@ -197,39 +197,43 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
         {selectedType === 'project' && (
           <>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Title</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Title</label>
               <input
                 type="text"
                 value={(item as Project).title}
                 onChange={(e) => updateFn({ title: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">FPS</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">FPS</label>
               <input
                 type="number"
                 value={(item as Project).fps}
                 onChange={(e) => updateFn({ fps: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Aspect Ratio</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Aspect Ratio</label>
               <input
                 type="text"
                 value={(item as Project).aspectRatio}
                 onChange={(e) => updateFn({ aspectRatio: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Global Notes</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Global Notes</label>
               <textarea
                 value={(item as Project).globalNotes}
                 onChange={(e) => updateFn({ globalNotes: e.target.value })}
                 rows={6}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
           </>
@@ -238,39 +242,43 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
         {selectedType === 'scene' && (
           <>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Scene Number</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Scene Number</label>
               <input
                 type="text"
                 value={(item as Scene).sceneNumber}
                 onChange={(e) => updateFn({ sceneNumber: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Title</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Title</label>
               <input
                 type="text"
                 value={(item as Scene).title}
                 onChange={(e) => updateFn({ title: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Summary</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Summary</label>
               <textarea
                 value={(item as Scene).summary}
                 onChange={(e) => updateFn({ summary: e.target.value })}
                 rows={3}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Notes</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Notes</label>
               <textarea
                 value={(item as Scene).notes}
                 onChange={(e) => updateFn({ notes: e.target.value })}
                 rows={4}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
           </>
@@ -279,11 +287,11 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
         {selectedType === 'shot' && (
           <>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Scene</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Scene</label>
               <select
                 value={(item as Shot).sceneId || ''}
                 onChange={(e) => updateFn({ sceneId: e.target.value || undefined })}
-                className="w-full px-3 py-2 pr-8 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="w-full px-3 py-2 pr-8 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
                 style={{ paddingRight: 'calc(0.75rem + 4px)' }}
               >
                 <option value="">Unassigned</option>
@@ -295,44 +303,60 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Duration (ms)</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Duration (ms)</label>
               <input
                 type="number"
                 min="300"
                 value={(item as Shot).duration}
                 onChange={(e) => {
-                  const value = Math.max(300, Number(e.target.value));
+                  const value = Number(e.target.value);
+                  if (value < 300) {
+                    // Show error only when user tries to enter < 300
+                    return;
+                  }
                   updateFn({ duration: value });
                 }}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                onBlur={(e) => {
+                  const value = Number(e.target.value);
+                  if (value < 300) {
+                    updateFn({ duration: 300 });
+                  }
+                }}
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
-              <p className="text-xs text-slate-400 mt-1">Minimum: 300ms</p>
+              {((item as Shot).duration || 0) < 300 && (
+                <p className="text-xs text-red-400 mt-1">Minimum: 300ms</p>
+              )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Script Text</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Script Text</label>
               <textarea
                 value={(item as Shot).scriptText}
                 onChange={(e) => updateFn({ scriptText: e.target.value })}
                 rows={4}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Tags (comma-separated)</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Tags (comma-separated)</label>
               <input
                 type="text"
                 value={(item as Shot).tags.join(', ')}
                 onChange={(e) => updateFn({ tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">General Notes</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">General Notes</label>
               <textarea
                 value={(item as Shot).generalNotes}
                 onChange={(e) => updateFn({ generalNotes: e.target.value })}
                 rows={3}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             {/* Image Carousel */}
@@ -571,9 +595,10 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                         <button
                           key={index}
                           onClick={() => setCurrentImageIndex(index)}
-                          className={`w-2 h-2 rounded-full ${
+                          className={`w-2 h-1 rounded-full ${
                             index === currentImageIndex ? 'bg-slate-400' : 'bg-slate-600'
                           }`}
+                          style={{ height: '4px' }}
                         />
                       ))}
                     </div>
@@ -587,12 +612,13 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
         {selectedType === 'frame' && (
           <>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Caption</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Caption</label>
               <textarea
                 value={(item as StoryboardFrame).caption}
                 onChange={(e) => updateFn({ caption: e.target.value })}
                 rows={3}
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-slate-100 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                placeholder="Click to edit"
+                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>

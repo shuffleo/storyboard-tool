@@ -130,7 +130,7 @@ export const useStore = create<Store>((set, get) => ({
               orderIndex: sceneNum * 5 + shotNum,
               shotCode,
               scriptText: '',
-              duration: 1000, // Default 1 second (1000ms)
+              duration: 500, // Default 500ms
               status: 'todo',
               tags: [],
               cameraNotes: '',
@@ -373,7 +373,7 @@ export const useStore = create<Store>((set, get) => ({
       orderIndex: maxOrder + 1,
       shotCode,
       scriptText: '',
-      duration: 1000, // Default 1 second (1000ms)
+      duration: 500, // Default 500ms
       status: 'todo',
       tags: [],
       cameraNotes: '',

@@ -483,13 +483,13 @@ export function TableView({ onSelect }: TableViewProps) {
         <table className="w-full border-collapse">
           <thead className="bg-slate-800 sticky top-0 z-10">
             <tr>
-              {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-300 w-8"></th>}
-              {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-300 w-8"></th>}
-              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-300 w-20">Shot</th>
-              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-300 w-24">Thumbnail</th>
-              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-300">Script</th>
-              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-300">General Notes</th>
-              {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-300 w-20"></th>}
+              {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
+              {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
+              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20 uppercase">Shot</th>
+              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-24 uppercase">Thumbnail</th>
+              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">Script</th>
+              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">General Notes</th>
+              {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20"></th>}
             </tr>
           </thead>
           <tbody>
@@ -923,7 +923,7 @@ const ShotRow = React.memo(function ShotRow({
             }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-            className="border border-slate-500 bg-slate-900 text-slate-100 rounded text-xs focus:outline-none resize-none"
+            className="border border-slate-500 bg-slate-900 text-white rounded text-xs focus:outline-none resize-none"
             style={{ 
               minHeight: '4rem',
               width: '100%',
@@ -960,7 +960,7 @@ const ShotRow = React.memo(function ShotRow({
           }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
-          className="w-full px-2 py-1 border border-slate-500 bg-slate-900 text-slate-100 rounded text-xs focus:outline-none"
+          className="w-full px-2 py-1 border border-slate-500 bg-slate-900 text-white rounded text-xs focus:outline-none"
         />
       );
     }
@@ -1028,25 +1028,27 @@ const ShotRow = React.memo(function ShotRow({
       <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'}`}>
         {renderCell('shotCode', shot.shotCode)}
       </td>
-      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'}`}>
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} text-center`}>
         {frames.length > 0 ? (
-          <ImageThumbnail
-            frames={frames}
-            currentImageIndex={currentImageIndex}
-            shotId={shot.id}
-            onThumbnailClick={onThumbnailClick}
-            onImageIndexChange={onImageIndexChange}
-            onImageHover={onImageHover}
-          />
+          <div className="flex justify-center">
+            <ImageThumbnail
+              frames={frames}
+              currentImageIndex={currentImageIndex}
+              shotId={shot.id}
+              onThumbnailClick={onThumbnailClick}
+              onImageIndexChange={onImageIndexChange}
+              onImageHover={onImageHover}
+            />
+          </div>
         ) : (
           <div
-            className="w-16 h-10 bg-slate-800 rounded border border-slate-600 flex items-center justify-center text-xs text-slate-500 cursor-pointer hover:bg-slate-700"
+            className="w-16 h-10 bg-slate-800 rounded border border-slate-600 flex items-center justify-center text-xs text-slate-500 cursor-pointer hover:bg-slate-700 mx-auto"
             onClick={(e) => {
               e.stopPropagation();
               onThumbnailClick();
             }}
           >
-            No image
+            Image
           </div>
         )}
       </td>
