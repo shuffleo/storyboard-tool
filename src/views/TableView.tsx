@@ -485,10 +485,10 @@ export function TableView({ onSelect }: TableViewProps) {
             <tr>
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
-              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20 uppercase">Shot</th>
+              <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20 uppercase">Shot</th>
               <th className="p-2 border-b border-slate-700 text-center text-xs font-semibold text-slate-400 w-24 uppercase">Thumbnail</th>
-              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">Script</th>
-              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">General Notes</th>
+              <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">Script</th>
+              <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">General Notes</th>
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20"></th>}
             </tr>
           </thead>
@@ -1032,10 +1032,10 @@ const ShotRow = React.memo(function ShotRow({
           </div>
         </td>
       )}
-      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'}`}>
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} w-20`}>
         {renderCell('shotCode', shot.shotCode)}
       </td>
-      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} text-center`}>
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} text-center w-24`}>
         {frames.length > 0 ? (
           <div className="flex justify-center">
             <ImageThumbnail

@@ -268,21 +268,27 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
 
   return (
     <div className="h-auto sm:h-12 bg-slate-800 border-b border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between px-2 sm:px-4 py-2 sm:py-0 shadow-sm gap-2 sm:gap-0">
-      <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
+      <div className={`flex flex-wrap items-center gap-2 sm:gap-4 ${isEditingTitle ? 'w-full' : 'w-full sm:w-auto'}`}>
         {isEditingTitle ? (
           <input
             type="text"
             value={titleValue}
             onChange={handleTitleChange}
             onBlur={handleTitleBlur}
-            onKeyDown={handleTitleKeyDown}
+            onKeyDown={(e) => {
+              // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+              if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                return; // Let browser handle these
+              }
+              handleTitleKeyDown(e);
+            }}
             maxLength={100}
-            className="text-lg font-semibold text-slate-100 bg-transparent border-b-2 border-slate-500 focus:outline-none w-full sm:w-auto flex-1"
+            className="text-lg font-semibold text-slate-100 bg-transparent border-b-2 border-slate-500 focus:outline-none w-full"
             autoFocus
           />
         ) : (
           <h1
-            className="text-lg font-semibold text-slate-100 cursor-text hover:text-slate-300 max-w-[200px]"
+            className="text-lg font-semibold text-slate-100 cursor-text hover:text-slate-300 max-w-[300px]"
             onClick={() => setIsEditingTitle(true)}
             title={displayTitle}
             style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}

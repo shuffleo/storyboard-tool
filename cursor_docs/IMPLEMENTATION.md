@@ -306,6 +306,112 @@ onKeyDown={(e) => {
 
 ## Common Refactoring Mistakes to Avoid
 
+### ⚠️ CRITICAL: React Hooks and Temporal Dead Zone Errors
+
+**NEVER reference variables in hooks before they are declared/initialized.**
+
+#### The Mistake: Temporal Dead Zone Error
+When adding `useEffect` hooks that depend on computed values, ensure those values are available when the hook runs.
+
+**WRONG** (causes "Cannot access 'item' before initialization"):
+```tsx
+// ❌ BAD: useEffect references 'item' before it's declared
+React.useEffect(() => {
+  if (selectedType === 'shot' && item) {  // ERROR: item not declared yet!
+    const shot = item as Shot;
+    setDurationValue(String(shot.duration || ''));
+  }
+}, [selectedId, selectedType, item]);  // ERROR: item in dependency array
+
+// Early return
+if (!selectedId || !selectedType) {
+  return <div>No selection</div>;
+}
+
+// item is declared here (too late!)
+let item: Shot | null = null;
+if (selectedType === 'shot') {
+  item = shots.find(s => s.id === selectedId) || null;
+}
+```
+
+**ALSO WRONG** (violates React hooks rules):
+```tsx
+// Early return
+if (!selectedId || !selectedType) {
+  return <div>No selection</div>;
+}
+
+// ❌ BAD: Hook after early return = conditional hook call
+let item: Shot | null = null;
+if (selectedType === 'shot') {
+  item = shots.find(s => s.id === selectedId) || null;
+}
+
+React.useEffect(() => {
+  // This hook is called conditionally (after early return)
+  // Violates React's rules of hooks!
+}, [item]);
+```
+
+**CORRECT** (look up value directly from store/state):
+```tsx
+// ✅ GOOD: Look up value directly, hooks before early return
+React.useEffect(() => {
+  if (selectedType === 'shot' && selectedId) {
+    // Look up directly from store instead of using 'item'
+    const shot = shots.find(s => s.id === selectedId);
+    if (shot) {
+      setDurationValue(String(shot.duration || ''));
+      setDurationError(false);
+    }
+  }
+}, [selectedId, selectedType, shots]);  // Use store values, not computed 'item'
+
+// Early return AFTER all hooks
+if (!selectedId || !selectedType) {
+  return <div>No selection</div>;
+}
+
+// item computed here (for use in JSX, not in hooks)
+let item: Shot | null = null;
+if (selectedType === 'shot') {
+  item = shots.find(s => s.id === selectedId) || null;
+}
+```
+
+#### Rules to Follow:
+1. **All hooks must be called unconditionally** at the top level, before any early returns
+2. **Never reference computed variables in hooks** that are declared later in the component
+3. **Use store/state values directly** in hook dependencies instead of computed values
+4. **If you need a computed value in a hook**, compute it inside the hook using the raw dependencies
+
+#### Callback Memoization
+**ALWAYS memoize callbacks passed as props** to prevent infinite re-render loops.
+
+**WRONG** (causes infinite loops):
+```tsx
+// ❌ BAD: handleSelect recreated on every render
+const handleSelect = (id: string, type: string) => {
+  setSelectedId(id);
+  setSelectedType(type);
+};
+
+// In child component:
+useEffect(() => {
+  onSelect(currentFrame.shotId, 'shot');  // Runs every render!
+}, [currentFrame?.shotId, onSelect]);  // onSelect changes every render
+```
+
+**CORRECT**:
+```tsx
+// ✅ GOOD: Memoized with useCallback
+const handleSelect = useCallback((id: string, type: string) => {
+  setSelectedId(id);
+  setSelectedType(type);
+}, [selectedId, selectedType]);  // Only recreate when these change
+```
+
 ### ⚠️ CRITICAL: Removing Conditional Rendering
 
 **When removing conditional rendering, ALWAYS remove BOTH branches completely.**
@@ -394,6 +500,9 @@ After any refactoring, verify:
 - [ ] New scenes automatically get at least one shot
 - [ ] Click handlers don't cause blank screens (Animatics, Storyboard, Table views)
 - [ ] Image error handling shows error message instead of blank screen
+- [ ] Animatics view loads without "Cannot access before initialization" errors
+- [ ] Inspector component doesn't crash when switching views
+- [ ] No infinite re-render loops when selecting items in Animatics view
 - [ ] Scrollbar sync works in Animatics view (time ruler hidden, timeline visible)
 - [ ] Drag-and-drop works in Storyboard and Animatics views with scene dimming
 - [ ] Inspector panel shot code in header works correctly

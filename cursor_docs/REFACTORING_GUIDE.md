@@ -126,6 +126,39 @@ Before submitting changes, verify:
 - [ ] Compact mode works correctly
 - [ ] Removed fields stay removed
 
+## React Hooks and Temporal Dead Zone Errors
+
+### The Mistake: Referencing Variables Before Declaration
+
+**Error**: `Uncaught ReferenceError: Cannot access 'item' before initialization`
+
+This occurs when:
+1. A `useEffect` hook references a variable (like `item`) that is declared later in the component
+2. The hook is placed before the variable declaration, causing a temporal dead zone error
+
+**Solution**: Always use store/state values directly in hooks, not computed variables. See `IMPLEMENTATION.md` section "React Hooks and Temporal Dead Zone Errors" for detailed examples.
+
+### The Mistake: Conditional Hook Calls
+
+**Error**: React warnings about hooks being called conditionally
+
+This occurs when:
+1. Hooks are placed after early returns
+2. Hooks are inside conditional statements
+
+**Solution**: All hooks must be called unconditionally at the top level, before any early returns.
+
+### The Mistake: Unmemoized Callbacks Causing Infinite Loops
+
+**Error**: Infinite re-renders, blank screens, performance issues
+
+This occurs when:
+1. Callback functions passed as props are not memoized with `useCallback`
+2. Child components have `useEffect` hooks that depend on these callbacks
+3. The callback changes on every render, triggering the effect repeatedly
+
+**Solution**: Always wrap callbacks passed as props in `useCallback` with proper dependencies.
+
 ## Common Error Messages
 
 ### "Unexpected token"

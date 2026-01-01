@@ -32,6 +32,9 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
   // CRITICAL: Hooks must be called unconditionally at the top level
   // Use a Map to track current image index per shot
   const [currentImageIndices, setCurrentImageIndices] = React.useState<Map<string, number>>(new Map());
+  // Local state for duration field to allow free typing with validation
+  const [durationValue, setDurationValue] = React.useState<string>('');
+  const [durationError, setDurationError] = React.useState(false);
   
   debugLogger.log('Inspector', 'Store data retrieved', {
     projectExists: !!project,
@@ -67,6 +70,17 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, selectedType, frames.length]);
+
+  // Sync duration value when selected shot changes (must be before early return for hooks rules)
+  React.useEffect(() => {
+    if (selectedType === 'shot' && selectedId) {
+      const shot = shots.find(s => s.id === selectedId);
+      if (shot) {
+        setDurationValue(String(shot.duration || ''));
+        setDurationError(false);
+      }
+    }
+  }, [selectedId, selectedType, shots]);
 
   if (!selectedId || !selectedType) {
     debugLogger.log('Inspector', 'No selection - rendering empty state', {
@@ -170,7 +184,7 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
 
   return (
     <div className="w-80 bg-slate-800 border-l border-slate-700 flex flex-col h-full">
-      <div className="p-4 border-b border-slate-700 flex items-center justify-between gap-3">
+      <div className={`p-4 flex items-center justify-between gap-3 ${currentView !== 'animatics' ? 'border-b border-slate-700' : ''}`} style={{ height: '70px' }}>
         {selectedType === 'shot' ? (
           <div className="flex items-center gap-3 flex-1">
             <h2 className="font-semibold text-slate-100 capitalize">Shot</h2>
@@ -178,6 +192,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
               type="text"
               value={(item as Shot).shotCode}
               onChange={(e) => updateFn({ shotCode: e.target.value })}
+              onKeyDown={(e) => {
+                // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                  return; // Let browser handle these
+                }
+              }}
               className="flex-1 px-2 py-1 border border-slate-600 bg-slate-900 text-slate-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
             />
           </div>
@@ -202,6 +222,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                 type="text"
                 value={(item as Project).title}
                 onChange={(e) => updateFn({ title: e.target.value })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
@@ -212,6 +238,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                 type="number"
                 value={(item as Project).fps}
                 onChange={(e) => updateFn({ fps: Number(e.target.value) })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
@@ -222,6 +254,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                 type="text"
                 value={(item as Project).aspectRatio}
                 onChange={(e) => updateFn({ aspectRatio: e.target.value })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
@@ -231,6 +269,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
               <textarea
                 value={(item as Project).globalNotes}
                 onChange={(e) => updateFn({ globalNotes: e.target.value })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 rows={6}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
@@ -247,6 +291,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                 type="text"
                 value={(item as Scene).sceneNumber}
                 onChange={(e) => updateFn({ sceneNumber: e.target.value })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
@@ -257,6 +307,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                 type="text"
                 value={(item as Scene).title}
                 onChange={(e) => updateFn({ title: e.target.value })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
@@ -266,6 +322,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
               <textarea
                 value={(item as Scene).summary}
                 onChange={(e) => updateFn({ summary: e.target.value })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 rows={3}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
@@ -276,6 +338,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
               <textarea
                 value={(item as Scene).notes}
                 onChange={(e) => updateFn({ notes: e.target.value })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 rows={4}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
@@ -306,26 +374,44 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
               <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Duration (ms)</label>
               <input
                 type="number"
-                min="300"
-                value={(item as Shot).duration}
+                value={durationValue}
                 onChange={(e) => {
-                  const value = Number(e.target.value);
-                  if (value < 300) {
-                    // Show error only when user tries to enter < 300
-                    return;
+                  const value = e.target.value;
+                  setDurationValue(value);
+                  const numValue = Number(value);
+                  if (value !== '' && numValue < 300) {
+                    setDurationError(true);
+                  } else {
+                    setDurationError(false);
                   }
-                  updateFn({ duration: value });
                 }}
                 onBlur={(e) => {
-                  const value = Number(e.target.value);
-                  if (value < 300) {
-                    updateFn({ duration: 300 });
+                  const numValue = Number(e.target.value);
+                  if (e.target.value !== '' && numValue >= 300) {
+                    updateFn({ duration: numValue });
+                    setDurationError(false);
+                  } else if (e.target.value === '') {
+                    // If empty, revert to original value
+                    const shot = item as Shot;
+                    setDurationValue(String(shot.duration || ''));
+                    setDurationError(false);
+                  }
+                  // If invalid (< 300), keep showing error but don't commit
+                }}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
                   }
                 }}
                 placeholder="Click to edit"
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className={`w-full px-3 py-2 border bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 ${
+                  durationError 
+                    ? 'border-red-500 focus:ring-red-500' 
+                    : 'border-slate-600 focus:ring-slate-500'
+                }`}
               />
-              {((item as Shot).duration || 0) < 300 && (
+              {durationError && (
                 <p className="text-xs text-red-400 mt-1">Minimum: 300ms</p>
               )}
             </div>
@@ -334,6 +420,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
               <textarea
                 value={(item as Shot).scriptText}
                 onChange={(e) => updateFn({ scriptText: e.target.value })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 rows={4}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
@@ -345,6 +437,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                 type="text"
                 value={(item as Shot).tags.join(', ')}
                 onChange={(e) => updateFn({ tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
@@ -354,6 +452,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
               <textarea
                 value={(item as Shot).generalNotes}
                 onChange={(e) => updateFn({ generalNotes: e.target.value })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 rows={3}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
@@ -590,7 +694,7 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                     )}
                   </div>
                   {shotFrames.length > 1 && (
-                    <div className="flex gap-1 mt-2 justify-center text-[8px]">
+                    <div className="flex gap-1 mt-2 justify-center text-[4px]">
                       {shotFrames.map((_, index) => (
                         <button
                           key={index}
@@ -616,6 +720,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
               <textarea
                 value={(item as StoryboardFrame).caption}
                 onChange={(e) => updateFn({ caption: e.target.value })}
+                onKeyDown={(e) => {
+                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
+                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                    return; // Let browser handle these
+                  }
+                }}
                 rows={3}
                 placeholder="Click to edit"
                 className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"

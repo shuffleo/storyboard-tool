@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useStore } from './store/useStore';
 import { TableView } from './views/TableView';
 import { StoryboardView } from './views/StoryboardView';
@@ -55,7 +55,13 @@ function App() {
     }
   }, []);
 
-  const handleSelect = (id: string, type: 'project' | 'scene' | 'shot' | 'frame') => {
+  // Update document title with project name
+  useEffect(() => {
+    const projectTitle = project?.title || 'Untitled Project';
+    document.title = `${projectTitle} - Storyboard Tool`;
+  }, [project?.title]);
+
+  const handleSelect = useCallback((id: string, type: 'project' | 'scene' | 'shot' | 'frame') => {
       debugLogger.log('App', 'handleSelect called', { 
       id, 
       type,
@@ -127,7 +133,7 @@ function App() {
         previousType: selectedType
       });
     }
-  };
+  }, [selectedId, selectedType, currentView]);
 
   if (!isInitialized) {
     console.log('App: Not initialized, showing loading screen');
