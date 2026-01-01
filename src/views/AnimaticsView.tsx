@@ -629,8 +629,8 @@ export function AnimaticsView({ onSelect }: AnimaticsViewProps) {
           
           {/* Shot Info Overlay */}
           {currentFrame && (
-            <div className="absolute top-4 left-4 bg-slate-800/90 px-3 py-2 rounded">
-              <div className="text-sm font-semibold">Shot {currentFrame.shot.shotCode}</div>
+            <div className="absolute top-4 left-4 bg-black/90 px-3 py-2 rounded">
+              <div className="text-sm font-semibold text-white">Shot {currentFrame.shot.shotCode}</div>
               <div className="text-xs text-slate-400">{formatTime(currentTime)} / {formatTime(totalDuration)}</div>
             </div>
           )}
@@ -803,12 +803,12 @@ export function AnimaticsView({ onSelect }: AnimaticsViewProps) {
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
                 </svg>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" />
                 </svg>
               )}
             </button>

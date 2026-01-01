@@ -486,7 +486,7 @@ export function TableView({ onSelect }: TableViewProps) {
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
               <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20 uppercase">Shot</th>
-              <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-24 uppercase">Thumbnail</th>
+              <th className="p-2 border-b border-slate-700 text-center text-xs font-semibold text-slate-400 w-24 uppercase">Thumbnail</th>
               <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">Script</th>
               <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">General Notes</th>
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20"></th>}
@@ -989,7 +989,14 @@ const ShotRow = React.memo(function ShotRow({
             checked={isSelected}
             onChange={() => onToggleSelect(shot.id)}
             onClick={(e) => e.stopPropagation()}
-            className="cursor-pointer"
+            className="cursor-pointer rounded-none border border-slate-600"
+            style={{
+              borderRadius: 0,
+              accentColor: 'white',
+              width: '1rem',
+              height: '1rem',
+              borderWidth: '1px'
+            }}
           />
         </td>
       )}

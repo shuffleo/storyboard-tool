@@ -535,7 +535,7 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                       </button>
                     )}
                   </div>
-                  <div className="relative">
+                  <div className="relative min-h-[120px] flex items-center justify-center">
                     {currentFrame?.image ? (
                       <img
                         src={currentFrame.image}
@@ -590,12 +590,12 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                     )}
                   </div>
                   {shotFrames.length > 1 && (
-                    <div className="flex gap-1 mt-2 justify-center">
+                    <div className="flex gap-1 mt-2 justify-center text-[8px]">
                       {shotFrames.map((_, index) => (
                         <button
                           key={index}
                           onClick={() => setCurrentImageIndex(index)}
-                          className={`w-2 h-1 rounded-full ${
+                          className={`w-2 rounded-full ${
                             index === currentImageIndex ? 'bg-slate-400' : 'bg-slate-600'
                           }`}
                           style={{ height: '4px' }}

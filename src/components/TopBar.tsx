@@ -176,7 +176,10 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
   const handleTitleBlur = () => {
     setIsEditingTitle(false);
     if (project && titleValue !== project.title) {
-      updateProject({ title: titleValue });
+      // Truncate to 100 characters max
+      const truncatedTitle = titleValue.length > 100 ? titleValue.substring(0, 100) : titleValue;
+      updateProject({ title: truncatedTitle });
+      setTitleValue(truncatedTitle);
     }
   };
 
@@ -188,6 +191,23 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
       setIsEditingTitle(false);
     }
   };
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Limit to 100 characters
+    if (value.length <= 100) {
+      setTitleValue(value);
+    }
+  };
+
+  // Get display title (truncated in middle if too long)
+  const displayTitle = project?.title || 'Untitled Project';
+  const truncateMiddle = (text: string, maxLength: number): string => {
+    if (text.length <= maxLength) return text;
+    const half = Math.floor(maxLength / 2) - 1;
+    return text.substring(0, half) + '...' + text.substring(text.length - half);
+  };
+  const truncatedDisplayTitle = truncateMiddle(displayTitle, 30);
 
   useEffect(() => {
     if (project?.title) {
@@ -253,86 +273,94 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
           <input
             type="text"
             value={titleValue}
-            onChange={(e) => setTitleValue(e.target.value)}
+            onChange={handleTitleChange}
             onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
-            className="text-lg font-semibold text-slate-100 bg-transparent border-b-2 border-slate-500 focus:outline-none"
+            maxLength={100}
+            className="text-lg font-semibold text-slate-100 bg-transparent border-b-2 border-slate-500 focus:outline-none w-full sm:w-auto flex-1"
             autoFocus
           />
         ) : (
           <h1
-            className="text-lg font-semibold text-slate-100 cursor-text hover:text-slate-300"
+            className="text-lg font-semibold text-slate-100 cursor-text hover:text-slate-300 max-w-[200px]"
             onClick={() => setIsEditingTitle(true)}
+            title={displayTitle}
+            style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}
           >
-            {project?.title || 'Untitled Project'}
+            {truncatedDisplayTitle}
           </h1>
         )}
-        <div className="flex gap-1 sm:gap-2">
-          <button
-            onClick={() => onViewChange('table')}
-            className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
-              currentView === 'table'
-                ? 'bg-slate-600 text-white'
-                : 'text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            Table
-          </button>
-          <button
-            onClick={() => onViewChange('storyboard')}
-            className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
-              currentView === 'storyboard'
-                ? 'bg-slate-600 text-white'
-                : 'text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            Storyboard
-          </button>
-          <button
-            onClick={() => onViewChange('animatics')}
-            className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
-              currentView === 'animatics'
-                ? 'bg-slate-600 text-white'
-                : 'text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            Animatics
-          </button>
-        </div>
+        {!isEditingTitle && (
+          <>
+            <div className="flex gap-1 sm:gap-2">
+              <button
+                onClick={() => onViewChange('table')}
+                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
+                  currentView === 'table'
+                    ? 'bg-slate-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                Table
+              </button>
+              <button
+                onClick={() => onViewChange('storyboard')}
+                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
+                  currentView === 'storyboard'
+                    ? 'bg-slate-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                Storyboard
+              </button>
+              <button
+                onClick={() => onViewChange('animatics')}
+                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
+                  currentView === 'animatics'
+                    ? 'bg-slate-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                Animatics
+              </button>
+            </div>
+          </>
+        )}
       </div>
-      <div className="flex items-center gap-2 sm:gap-4">
-        <div className="flex items-center gap-1 sm:gap-2">
-          <button
-            onClick={undo}
-            disabled={!canUndo}
-            className={`p-1.5 sm:p-2 rounded ${canUndo ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'}`}
-            title="Undo (Cmd+Z)"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-            </svg>
-          </button>
-          <button
-            onClick={redo}
-            disabled={!canRedo}
-            className={`p-1.5 sm:p-2 rounded ${canRedo ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'}`}
-            title="Redo (Cmd+Shift+Z)"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
-            </svg>
-          </button>
-        </div>
-        <div className="relative" ref={menuRef}>
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="p-1.5 sm:p-2 text-slate-300 hover:bg-slate-700 rounded"
-            title="Menu"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-            </svg>
-          </button>
+      {!isEditingTitle && (
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <button
+              onClick={undo}
+              disabled={!canUndo}
+              className={`p-1.5 sm:p-2 rounded ${canUndo ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'}`}
+              title="Undo (Cmd+Z)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+            </button>
+            <button
+              onClick={redo}
+              disabled={!canRedo}
+              className={`p-1.5 sm:p-2 rounded ${canRedo ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'}`}
+              title="Redo (Cmd+Shift+Z)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+              </svg>
+            </button>
+          </div>
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="p-1.5 sm:p-2 text-slate-300 hover:bg-slate-700 rounded"
+              title="Menu"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              </svg>
+            </button>
           {menuOpen && (
             <div className="absolute right-0 mt-1 w-48 bg-slate-800 border border-slate-700 rounded shadow-lg z-50">
               <div className="py-1">
@@ -385,7 +413,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                   }}
                   className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
                 >
-                  {retroSkin ? 'Disable Retro Skin' : 'Enable Retro Skin'}
+                  {retroSkin ? 'Disable Brutal Mode' : 'Enable Brutal Mode'}
                 </button>
                 <button
                   onClick={() => {
@@ -524,8 +552,9 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
               </div>
             </div>
           )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

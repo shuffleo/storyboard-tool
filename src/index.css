@@ -234,3 +234,16 @@ html, body, #root {
   background-color: #330000 !important;
 }
 
+/* Checkbox styling - no rounded corners, white when selected, same stroke width */
+.retro-skin input[type="checkbox"] {
+  border-radius: 0 !important;
+  border-width: 1px !important;
+  border-color: var(--retro-border) !important;
+  accent-color: var(--retro-text) !important;
+}
+
+.retro-skin input[type="checkbox"]:checked {
+  background-color: var(--retro-text) !important;
+  border-color: var(--retro-text) !important;
+}
+
