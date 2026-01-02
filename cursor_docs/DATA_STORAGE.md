@@ -73,6 +73,7 @@ So the full path would be something like:
 
 **Always use the Export feature** to create backups:
 - Export to JSON for full backup
+- Export to IndexedDB for complete database backup
 - Export to ZIP for full backup with images included
 - Export to CSV for shot list
 - Export to PDF for storyboard sheets
@@ -98,9 +99,10 @@ The exported JSON contains:
 2. Or use the Export feature to backup, then clear browser data
 
 ### Want to move data to another computer?
-1. Export to ZIP (includes images) or JSON on the old computer
-2. Import ZIP or JSON on the new computer
+1. Export to ZIP (includes images), IndexedDB, or JSON on the old computer
+2. Import ZIP, IndexedDB, or JSON on the new computer
 3. ZIP format is recommended as it includes all images in a single file
+4. IndexedDB format provides a complete database backup
 
 ## Technical Details
 
@@ -109,4 +111,6 @@ The exported JSON contains:
 - **Storage Type**: IndexedDB (browser-native)
 - **Persistence**: Data persists until you clear browser data or delete the database
 - **Size Limit**: Browser-dependent (typically several GB available)
+- **Persistent Storage**: App requests persistent storage on initialization to reduce data loss risk
+- **PWA Support**: Installable as Progressive Web App for better data protection and offline access
 

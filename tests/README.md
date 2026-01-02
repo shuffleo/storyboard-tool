@@ -58,10 +58,9 @@ The test suite covers:
    - PDF export with images
    - ZIP archive handling
 
-5. **Google Drive Integration Tests**
-   - Connection/disconnection
-   - Sync functionality
-   - Error handling
+5. **Import/Export Tests (continued)**
+   - IndexedDB import/export
+   - WebM video export
 
 6. **Delete All Content Tests**
    - Confirmation dialog with three options

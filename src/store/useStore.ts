@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { ProjectState, Shot, Scene, StoryboardFrame, Sequence, Project } from '../types';
 import { db } from '../db/indexeddb';
 import { nanoid } from 'nanoid';
-import { googleDriveService } from '../utils/googleDrive';
 
 interface Store extends ProjectState {
   // Actions
@@ -50,13 +49,6 @@ interface Store extends ProjectState {
   isSaving: boolean;
   lastSaved: number | null;
   
-  // Google Drive
-  isGoogleDriveConnected: boolean;
-  isGoogleSyncing: boolean;
-  lastGoogleSync: number | null;
-  connectGoogleDrive: () => Promise<void>;
-  disconnectGoogleDrive: () => Promise<void>;
-  syncToGoogleDrive: () => Promise<void>;
   
   // Clear all content
   clearAllContent: () => Promise<void>;
@@ -89,12 +81,15 @@ export const useStore = create<Store>((set, get) => ({
   historyIndex: -1,
   canUndo: false,
   canRedo: false,
-  isGoogleDriveConnected: false,
-  isGoogleSyncing: false,
-  lastGoogleSync: null,
 
   init: async () => {
     try {
+      // Request persistent storage to reduce data loss risk
+      if ('storage' in navigator && 'persist' in navigator.storage) {
+        const isPersistent = await navigator.storage.persist();
+        console.log(`Store: Persistent storage ${isPersistent ? 'granted' : 'denied'}`);
+      }
+      
       console.log('Store: Loading project from IndexedDB...');
       const saved = await db.loadProject();
       if (saved) {
@@ -585,63 +580,9 @@ export const useStore = create<Store>((set, get) => ({
       });
       const savedTime = Date.now();
       set({ lastSaved: savedTime, isSaving: false });
-      
-      // Auto-sync to Google Drive if connected
-      if (state.isGoogleDriveConnected) {
-        get().syncToGoogleDrive();
-      }
     } catch (error) {
       console.error('Save failed:', error);
       set({ isSaving: false });
-    }
-  },
-
-  connectGoogleDrive: async () => {
-    try {
-      await googleDriveService.initialize();
-      const connected = await googleDriveService.signIn();
-      if (connected) {
-        set({ isGoogleDriveConnected: true });
-        // Sync immediately after connecting
-        get().syncToGoogleDrive();
-      } else {
-        alert('Failed to sign in to Google Drive. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Failed to connect to Google Drive:', error);
-      const errorMessage = error?.message || 'Unknown error';
-      alert(`Failed to connect to Google Drive: ${errorMessage}\n\nPlease check:\n1. VITE_GOOGLE_API_KEY and VITE_GOOGLE_CLIENT_ID are set in your .env file\n2. Google APIs scripts are loaded in index.html\n3. See README.md for setup instructions`);
-    }
-  },
-
-  disconnectGoogleDrive: async () => {
-    try {
-      await googleDriveService.signOut();
-      set({ isGoogleDriveConnected: false, lastGoogleSync: null });
-    } catch (error) {
-      console.error('Failed to disconnect from Google Drive:', error);
-    }
-  },
-
-  syncToGoogleDrive: async () => {
-    const state = get();
-    if (!state.isGoogleDriveConnected) return;
-
-    set({ isGoogleSyncing: true });
-    try {
-      const projectData = {
-        project: state.project,
-        sequences: state.sequences,
-        scenes: state.scenes,
-        shots: state.shots,
-        frames: state.frames,
-      };
-      await googleDriveService.syncProject(projectData);
-      set({ lastGoogleSync: Date.now(), isGoogleSyncing: false });
-    } catch (error) {
-      console.error('Google Drive sync failed:', error);
-      set({ isGoogleSyncing: false });
-      alert('Failed to sync to Google Drive. Please try again.');
     }
   },
 

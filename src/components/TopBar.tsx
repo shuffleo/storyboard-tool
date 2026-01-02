@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ViewType } from '../App';
 import { useStore } from '../store/useStore';
-import { exportToJSON, exportToCSV, exportStoryboardPDF, exportToZIP, exportAnimaticsToMP4, downloadFile, importFromJSON, importFromCSV, importFromZIP, importImages } from '../utils/importExport';
+import { exportToJSON, exportToCSV, exportStoryboardPDF, exportToZIP, exportAnimaticsToMP4, downloadFile, importFromJSON, importFromCSV, importFromZIP, importImages, exportIndexedDB, importIndexedDB } from '../utils/importExport';
 import { debugLogger } from '../utils/debug';
 
 interface TopBarProps {
@@ -18,11 +18,6 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
   const canRedo = useStore((state) => state.canRedo);
   const undo = useStore((state) => state.undo);
   const redo = useStore((state) => state.redo);
-  const isGoogleDriveConnected = useStore((state) => state.isGoogleDriveConnected);
-  const isGoogleSyncing = useStore((state) => state.isGoogleSyncing);
-  const lastGoogleSync = useStore((state) => state.lastGoogleSync);
-  const connectGoogleDrive = useStore((state) => state.connectGoogleDrive);
-  const disconnectGoogleDrive = useStore((state) => state.disconnectGoogleDrive);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(project?.title || 'Untitled Project');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -30,28 +25,27 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [debugMode, setDebugMode] = useState(debugLogger.isEnabled());
-  const [retroSkin, setRetroSkin] = useState(() => {
-    return localStorage.getItem('retroSkin') === 'true';
-  });
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const clearAllContent = useStore((state) => state.clearAllContent);
   
-  // Apply retro skin class to root element
+  // Apply retro skin class to root element (Brutal mode is default)
   useEffect(() => {
     const root = document.documentElement;
-    if (retroSkin) {
+    const saved = localStorage.getItem('retroSkin');
+    // Default to true (Brutal mode) if not set
+    const retroSkinEnabled = saved === null ? true : saved === 'true';
+    if (retroSkinEnabled) {
       root.classList.add('retro-skin');
     } else {
       root.classList.remove('retro-skin');
     }
-    localStorage.setItem('retroSkin', String(retroSkin));
-  }, [retroSkin]);
+  }, []);
 
   const formatLastSaved = () => {
-    // Use Google sync time if connected and synced, otherwise use local save time
-    const timeToUse = isGoogleDriveConnected && lastGoogleSync ? lastGoogleSync : lastSaved;
-    if (!timeToUse) return '';
-    const seconds = Math.floor((Date.now() - timeToUse) / 1000);
+    if (!lastSaved) return '';
+    const seconds = Math.floor((Date.now() - lastSaved) / 1000);
     if (seconds < 5) return 'Just now';
     if (seconds < 60) return `${seconds}s ago`;
     const minutes = Math.floor(seconds / 60);
@@ -164,12 +158,37 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
     setMenuOpen(false);
   };
 
-  const handleGoogleDriveToggle = async () => {
-    if (isGoogleDriveConnected) {
-      await disconnectGoogleDrive();
-    } else {
-      await connectGoogleDrive();
+  const handleExportIndexedDB = async () => {
+    try {
+      await exportIndexedDB();
+      setExportModalOpen(false);
+      setMenuOpen(false);
+    } catch (error) {
+      alert(`Failed to export IndexedDB: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  };
+
+  const handleImportIndexedDB = async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const replace = confirm('Replace all existing content? Click OK to replace, Cancel to add to existing content.');
+        try {
+          await importIndexedDB(file);
+          if (!replace) {
+            // If not replacing, we'd need to merge - for now just import
+            alert('IndexedDB import completed. Note: This replaces all data.');
+          }
+        } catch (error) {
+          alert(`Failed to import IndexedDB: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+    };
+    input.click();
+    setImportModalOpen(false);
     setMenuOpen(false);
   };
 
@@ -265,6 +284,37 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [importModalOpen, exportModalOpen]);
+
+  // Handle PWA install prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallPrompt(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+    
+    setDeferredPrompt(null);
+    setShowInstallPrompt(false);
+  };
 
   return (
     <div className="h-auto sm:h-12 bg-slate-800 border-b border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between px-2 sm:px-4 py-2 sm:py-0 shadow-sm gap-2 sm:gap-0">
@@ -390,16 +440,17 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                 >
                   Export
                 </button>
-                <button
-                  onClick={handleGoogleDriveToggle}
-                  disabled={isGoogleSyncing}
-                  className={`block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 ${
-                    isGoogleSyncing ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {isGoogleDriveConnected ? 'Disconnect from GDrive' : 'Connect to GDrive'}
-                  {isGoogleSyncing && <span className="ml-2 text-xs text-slate-400">(Syncing...)</span>}
-                </button>
+                {showInstallPrompt && (
+                  <button
+                    onClick={() => {
+                      handleInstallClick();
+                      setMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                  >
+                    Install App
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     const newState = !debugMode;
@@ -414,15 +465,6 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                 </button>
                 <button
                   onClick={() => {
-                    setRetroSkin(!retroSkin);
-                    setMenuOpen(false);
-                  }}
-                  className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
-                >
-                  {retroSkin ? 'Disable Brutal Mode' : 'Enable Brutal Mode'}
-                </button>
-                <button
-                  onClick={() => {
                     setMenuOpen(false);
                     setDeleteAllModalOpen(true);
                   }}
@@ -431,7 +473,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                   Delete All Content
                 </button>
                 <div className="px-4 py-2 text-xs sm:text-sm text-slate-400 border-t border-slate-700 mt-1">
-                  {isSaving || isGoogleSyncing ? (
+                  {isSaving ? (
                     <span>Last save: Saving...</span>
                   ) : (
                     <span>Last save: {formatLastSaved() || 'Never'}</span>
@@ -460,6 +502,9 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                   </button>
                   <button onClick={handleImportZIP} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     ZIP
+                  </button>
+                  <button onClick={handleImportIndexedDB} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
+                    IndexedDB
                   </button>
                 </div>
                 <div className="p-4 border-t border-slate-700">
@@ -494,11 +539,12 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                   <button onClick={handleExportZIP} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     ZIP (with images)
                   </button>
-                  {currentView === 'animatics' && (
-                    <button onClick={handleExportMP4} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
-                      MP4 Video
-                    </button>
-                  )}
+                  <button onClick={handleExportIndexedDB} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
+                    IndexedDB
+                  </button>
+                  <button onClick={handleExportMP4} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
+                    WebM Video
+                  </button>
                 </div>
                 <div className="p-4 border-t border-slate-700">
                   <button

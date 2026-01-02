@@ -12,6 +12,7 @@ This is a local-first web application for animation project management. All data
 
 ### Styling
 - **Tailwind CSS**: Utility-first CSS framework
+- **Brutal Mode**: Bold, high-contrast design enabled by default
 - **Dark Mode**: Explicitly forced to dark mode in `src/index.css` with neutral grayscale palette (slate colors)
 
 ### Views
@@ -579,7 +580,6 @@ src/
 - Undo/Redo system fixed to correctly track history (100 action limit)
 - Default project initialization: 3 scenes with 5 shots each
 - New scenes automatically create at least one shot
-- Google Drive integration support (requires API credentials setup)
 - Click handler safety: All handlers validated to prevent blank screen crashes
 - Error handling: Comprehensive null checks and try-catch blocks
 - Scrollbar sync: Time ruler scrollbar hidden, timeline scrollbar visible and synchronized

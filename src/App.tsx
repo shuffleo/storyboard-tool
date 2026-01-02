@@ -47,9 +47,10 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Apply retro skin on mount if enabled
+  // Apply retro skin on mount if enabled (default to true)
   useEffect(() => {
-    const retroSkinEnabled = localStorage.getItem('retroSkin') === 'true';
+    const saved = localStorage.getItem('retroSkin');
+    const retroSkinEnabled = saved === null ? true : saved === 'true';
     if (retroSkinEnabled) {
       document.documentElement.classList.add('retro-skin');
     }

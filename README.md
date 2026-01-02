@@ -13,8 +13,7 @@ A **local-first, lightweight web application** for managing and iterating on ani
 - **Dark Theme**: Modern dark UI throughout the application
 - **Local-First**: All data stored in IndexedDB, works fully offline
 - **Auto-save**: Continuous autosave on every change
-- **Import/Export**: JSON, CSV, ZIP (with images), PDF, and image import support
-- **Google Drive Integration**: Optional Google Drive sync for cloud backup
+- **Import/Export**: JSON, CSV, ZIP (with images), PDF, IndexedDB, and image import support
 - **No Backend**: Runs entirely in the browser, perfect for GitHub Pages or local use
 
 ## Tech Stack
@@ -95,7 +94,8 @@ When you first open the app, a default project is created with 3 scenes, each co
   - **JSON**: Full backup (no images)
   - **CSV**: Shot list only
   - **PDF**: Storyboard sheets
-  - **MP4** (Animatics view only): Export animatics as video
+  - **IndexedDB**: Complete database backup
+  - **WebM Video**: Export animatics as video (available from all views)
 - **Delete All Content**: Available in three-dot menu with confirmation dialog. Options: Delete All Content, Export and Delete All Content, Cancel
 
 ## Data Model
@@ -178,48 +178,3 @@ Modern browsers with IndexedDB support:
 - Firefox (latest)
 - Safari (latest)
 
-## Google Drive Integration
-
-The app supports Google Drive as a backend storage option. When connected, your project data syncs to Google Sheets and images are stored in scene-named folders on Google Drive.
-
-### Setup
-
-1. **Create Google Cloud Project**:
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select an existing one
-   - Enable the following APIs:
-     - Google Drive API
-     - Google Sheets API
-
-2. **Create OAuth 2.0 Credentials**:
-   - Go to "APIs & Services" > "Credentials"
-   - Click "Create Credentials" > "OAuth client ID"
-   - Choose "Web application"
-   - Add your domain to "Authorized JavaScript origins"
-   - Copy the Client ID
-
-3. **Get API Key**:
-   - In "Credentials", create an API Key
-   - Restrict it to Google Drive API and Google Sheets API (optional but recommended)
-
-4. **Configure Environment Variables**:
-   Create a `.env` file in the project root:
-   ```
-   VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-   VITE_GOOGLE_API_KEY=your-api-key
-   ```
-
-5. **Connect in App**:
-   - Click the three-dot menu (⋮) in the top bar
-   - Select "Connect to GDrive"
-   - Authorize the app when prompted
-
-### How It Works
-
-- **Google Sheets**: Project table data (shots, scenes, script text, notes) syncs to a Google Sheet named "{Project Title} - Storyboard"
-- **Google Drive Folders**: Images are organized in folders:
-  - Main folder: "{Project Title} - Images"
-  - Scene folders: "Scene {Number}: {Title}"
-  - Images are named: "shot-{Code}-frame-{Index}.png"
-
-The "Saved" time in the menu reflects the last Google Drive sync time when connected, otherwise it shows the local save time.

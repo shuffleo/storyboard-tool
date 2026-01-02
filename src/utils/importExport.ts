@@ -362,7 +362,7 @@ function getExtensionFromMime(mime: string): string {
 }
 
 /**
- * Exports animatics as MP4 video
+ * Exports animatics as WebM video
  * Creates a video from shots with their durations
  */
 export async function exportAnimaticsToMP4(): Promise<void> {
@@ -612,6 +612,37 @@ export async function importImages(files: FileList): Promise<void> {
       };
       reader.readAsDataURL(file);
     });
+  }
+}
+
+/**
+ * Exports the entire IndexedDB database as a JSON file
+ */
+export async function exportIndexedDB(): Promise<void> {
+  const state = useStore.getState();
+  const snapshot: ProjectSnapshot = {
+    project: state.project,
+    sequences: state.sequences,
+    scenes: state.scenes,
+    shots: state.shots,
+    frames: state.frames,
+  };
+  const json = JSON.stringify(snapshot, null, 2);
+  downloadFile(json, `${state.project.title || 'storyboard'}-indexeddb.json`, 'application/json');
+}
+
+/**
+ * Imports an IndexedDB export file and replaces all current data
+ */
+export async function importIndexedDB(file: File): Promise<void> {
+  const text = await file.text();
+  const snapshot: ProjectSnapshot = JSON.parse(text);
+  
+  // Replace all content
+  await db.importProject(snapshot);
+  const loadedState = await db.loadProject();
+  if (loadedState) {
+    useStore.getState().loadProjectState(loadedState);
   }
 }
 
