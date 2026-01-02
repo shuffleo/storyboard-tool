@@ -486,7 +486,7 @@ export function TableView({ onSelect }: TableViewProps) {
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
               <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20 uppercase">Shot</th>
-              <th className="p-2 border-b border-slate-700 text-center text-xs font-semibold text-slate-400 w-24 uppercase">Thumbnail</th>
+              <th className={`p-2 border-b border-slate-700 text-center text-xs font-semibold text-slate-400 ${compactMode ? 'w-20' : 'w-24'} uppercase`}>Thumbnail</th>
               <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">Script</th>
               <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">General Notes</th>
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20"></th>}
@@ -771,6 +771,7 @@ interface ImageThumbnailProps {
   onThumbnailClick: () => void;
   onImageIndexChange: (shotId: string, index: number) => void;
   onImageHover: (image: string | null, x: number, y: number) => void;
+  compactMode?: boolean;
 }
 
 const ImageThumbnail = React.memo(function ImageThumbnail({
@@ -780,16 +781,17 @@ const ImageThumbnail = React.memo(function ImageThumbnail({
   onThumbnailClick,
   onImageIndexChange,
   onImageHover,
+  compactMode = false,
 }: ImageThumbnailProps) {
   const hoverTimeoutRef = React.useRef<number | null>(null);
   const isPreviewShowingRef = React.useRef(false);
 
-  // Show preview after 800ms hover delay
+  // Show preview after 600ms hover delay
   const handleMouseEnter = (e: React.MouseEvent) => {
     hoverTimeoutRef.current = window.setTimeout(() => {
       isPreviewShowingRef.current = true;
       onImageHover(frames[currentImageIndex]?.image || null, e.clientX, e.clientY);
-    }, 800);
+    }, 600);
   };
 
   const handleMouseLeave = () => {
@@ -810,7 +812,7 @@ const ImageThumbnail = React.memo(function ImageThumbnail({
 
   return (
     <div className="flex items-center gap-1">
-      {frames.length > 1 && (
+      {!compactMode && frames.length > 1 && (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -841,13 +843,13 @@ const ImageThumbnail = React.memo(function ImageThumbnail({
           alt=""
           className="w-full h-full object-cover rounded border border-slate-600"
         />
-        {frames.length > 1 && (
+        {!compactMode && frames.length > 1 && (
           <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs text-center py-0.5 font-semibold">
             {currentImageIndex + 1}/{frames.length}
           </div>
         )}
       </div>
-      {frames.length > 1 && (
+      {!compactMode && frames.length > 1 && (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -1035,7 +1037,7 @@ const ShotRow = React.memo(function ShotRow({
       <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} w-20`}>
         {renderCell('shotCode', shot.shotCode)}
       </td>
-      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} text-center w-24`}>
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} text-center ${compactMode ? 'w-20' : 'w-24'}`}>
         {frames.length > 0 ? (
           <div className="flex justify-center">
             <ImageThumbnail
@@ -1045,6 +1047,7 @@ const ShotRow = React.memo(function ShotRow({
               onThumbnailClick={onThumbnailClick}
               onImageIndexChange={onImageIndexChange}
               onImageHover={onImageHover}
+              compactMode={compactMode}
             />
           </div>
         ) : (

@@ -9,8 +9,20 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/storyboard-tool/vite.svg",
+      "src": "/storyboard-tool/favicon.svg",
       "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/storyboard-tool/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/storyboard-tool/icon-512.svg",
+      "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
