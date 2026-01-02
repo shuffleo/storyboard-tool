@@ -403,26 +403,6 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                 <button
                   onClick={() => {
                     setMenuOpen(false);
-                    setImportModalOpen(true);
-                  }}
-                  className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
-                  data-modal-trigger
-                >
-                  Import
-                </button>
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setExportModalOpen(true);
-                  }}
-                  className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
-                  data-modal-trigger
-                >
-                  Export
-                </button>
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
                     setProjectDetailsModalOpen(true);
                   }}
                   className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
@@ -440,6 +420,26 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                     Install App
                   </button>
                 )}
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setImportModalOpen(true);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                  data-modal-trigger
+                >
+                  Import
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setExportModalOpen(true);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                  data-modal-trigger
+                >
+                  Export
+                </button>
                 <button
                   onClick={() => {
                     const newState = !debugMode;

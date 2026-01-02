@@ -27,10 +27,25 @@ export function TableView({ onSelect }: TableViewProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState<Map<string, number>>(new Map());
   const [hoverPreview, setHoverPreview] = useState<{ image: string; x: number; y: number } | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ shotId: string; sceneName: string; isLastShot: boolean } | null>(null);
+  const [expandedScenes, setExpandedScenes] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const generalNotesTextareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize all scenes as expanded by default, and expand newly added scenes
+  useEffect(() => {
+    if (scenes.length > 0) {
+      setExpandedScenes(prev => {
+        const newSet = new Set(prev);
+        // Add all scene IDs to the expanded set
+        scenes.forEach(scene => {
+          newSet.add(scene.id);
+        });
+        return newSet;
+      });
+    }
+  }, [scenes]);
 
   // Sort scenes by sceneNumber (low to high)
   // CRITICAL: Sort by sceneNumber (as number) not orderIndex
@@ -513,12 +528,47 @@ export function TableView({ onSelect }: TableViewProps) {
             }).map(([sceneId, sceneShots]) => {
                         const scene = scenes.find((s) => s.id === sceneId);
                         const isUnassigned = sceneId === 'unassigned';
+                        const isExpanded = expandedScenes.has(sceneId);
+                        const toggleExpanded = () => {
+                          setExpandedScenes(prev => {
+                            const newSet = new Set(prev);
+                            if (newSet.has(sceneId)) {
+                              newSet.delete(sceneId);
+                            } else {
+                              newSet.add(sceneId);
+                            }
+                            return newSet;
+                          });
+                        };
                         return (
                           <React.Fragment key={sceneId}>
                             <tr className="bg-slate-800" data-scene-id={sceneId}>
                               <td colSpan={compactMode ? 4 : 7} className="p-3">
                                 <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-1">
+                                    {!isUnassigned && (
+                                      <button
+                                        onClick={toggleExpanded}
+                                        className="flex-shrink-0 text-slate-400 hover:text-slate-200 transition-transform"
+                                        style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                                      >
+                                        <svg
+                                          width="12"
+                                          height="12"
+                                          viewBox="0 0 12 12"
+                                          fill="none"
+                                          xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                          <path
+                                            d="M4.5 2L8.5 6L4.5 10"
+                                            stroke="currentColor"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                          />
+                                        </svg>
+                                      </button>
+                                    )}
                                     {isUnassigned ? (
                                       <span className="font-semibold text-sm text-slate-200">Unassigned</span>
                                     ) : (
@@ -554,7 +604,7 @@ export function TableView({ onSelect }: TableViewProps) {
                                         e.currentTarget.blur();
                                       }
                                     }}
-                                    className="font-semibold text-sm text-slate-200 bg-transparent border-b border-slate-500 focus:outline-none focus:border-slate-400"
+                                    className="font-semibold text-sm text-slate-200 bg-transparent border-b border-slate-500 focus:outline-none focus:border-slate-400 flex-1"
                                     placeholder={`Scene ${scene?.sceneNumber}`}
                                   />
                                     )}
@@ -571,7 +621,7 @@ export function TableView({ onSelect }: TableViewProps) {
                                 </div>
                               </td>
                             </tr>
-                            {sceneShots.map((shot) => {
+                            {isExpanded && sceneShots.map((shot) => {
                               const globalIndex = sortedShots.findIndex((s) => s.id === shot.id);
                               const canMoveUp = globalIndex > 0;
                               const canMoveDown = globalIndex < sortedShots.length - 1;
