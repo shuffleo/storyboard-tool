@@ -25,12 +25,72 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   useEffect(() => {
     localStorage.setItem('storyboardDensity', density);
   }, [density]);
+
+  // Group by scene toggle
+  const [groupByScene, setGroupByScene] = useState<boolean>(() => {
+    const saved = localStorage.getItem('storyboardGroupByScene');
+    return saved === 'true';
+  });
+
+  // Persist group by scene changes
+  useEffect(() => {
+    localStorage.setItem('storyboardGroupByScene', String(groupByScene));
+  }, [groupByScene]);
+
+  // Expanded scenes for accordion
+  const [expandedScenes, setExpandedScenes] = useState<Set<string>>(new Set());
+
+  // Initialize all scenes as expanded by default, and expand newly added scenes
+  useEffect(() => {
+    if (scenes.length > 0 && groupByScene) {
+      setExpandedScenes(prev => {
+        const newSet = new Set(prev);
+        // Add all scene IDs to the expanded set
+        scenes.forEach(scene => {
+          newSet.add(scene.id);
+        });
+        // Add 'unassigned' for shots without scene
+        newSet.add('unassigned');
+        return newSet;
+      });
+    }
+  }, [scenes, groupByScene]);
   const [selectedShots, setSelectedShots] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState<Map<string, number>>(new Map());
   const [dragShotId, setDragShotId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sort scenes by sceneNumber (low to high)
+  const sortedScenes = useMemo(() => {
+    return [...scenes].sort((a, b) => {
+      const numA = parseInt(a.sceneNumber, 10) || 0;
+      const numB = parseInt(b.sceneNumber, 10) || 0;
+      return numA - numB;
+    });
+  }, [scenes]);
+
+  // Group shots by scene
+  const shotsByScene = useMemo(() => {
+    const grouped = new Map<string | 'unassigned', typeof shots>();
+    shots.forEach(shot => {
+      const key = shot.sceneId || 'unassigned';
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(shot);
+    });
+    // Sort shots within each scene by shotCode
+    grouped.forEach((sceneShots) => {
+      sceneShots.sort((a, b) => {
+        const shotNumA = parseInt(a.shotCode, 10) || 0;
+        const shotNumB = parseInt(b.shotCode, 10) || 0;
+        return shotNumA - shotNumB;
+      });
+    });
+    return grouped;
+  }, [shots]);
 
   // Sort shots by sceneNumber first, then by shotCode
   // CRITICAL: Sort by sceneNumber (as number), then shotCode (as number)
@@ -390,15 +450,6 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
     setSelectedShots(new Set());
   };
 
-  // Sort scenes for dropdown
-  const sortedScenes = useMemo(() => {
-    return [...scenes].sort((a, b) => {
-      const numA = parseInt(a.sceneNumber, 10) || 0;
-      const numB = parseInt(b.sceneNumber, 10) || 0;
-      return numA - numB;
-    });
-  }, [scenes]);
-
   const handleMoveSelected = (direction: 'up' | 'down') => {
     if (focusedIndex === null || selectedShots.size === 0) return;
     
@@ -489,6 +540,141 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
     };
   }, [focusedIndex, sortedShots, selectedShots]);
 
+  // Helper function to render a shot card
+  const renderShotCard = (shot: typeof shots[0], index: number) => {
+    const shotFrames = getShotFrames(shot.id);
+    const sceneName = getSceneName(shot.sceneId);
+    const isSelected = selectedShots.has(shot.id);
+    const isFocused = focusedIndex === index;
+    const canMoveUp = index > 0;
+    const canMoveDown = index < sortedShots.length - 1;
+    
+    return (
+      <div
+        key={shot.id}
+        data-card
+        data-shot-id={shot.id}
+        draggable
+        onDragStart={(e) => handleCardDragStart(e, shot.id)}
+        className={`rounded-lg border-2 cursor-move flex flex-col ${
+          isSelected
+            ? 'bg-slate-700 border-slate-400 shadow-md'
+            : 'bg-slate-800 border-slate-600'
+        } ${isFocused ? 'ring-2 ring-slate-400' : ''} ${
+          density === 'compact' ? 'p-2' : 'p-2 sm:p-4'
+        } transition-all ${
+          dragShotId && shot.sceneId !== draggingSceneId ? 'opacity-30' : ''
+        } ${dragShotId === shot.id ? 'opacity-50' : ''}`}
+        onClick={(e) => handleCardClick(e, shot.id, index)}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <span className="font-semibold text-sm text-slate-100">{shot.shotCode}</span>
+          {sceneName && !groupByScene && (
+            <span className="text-xs text-slate-400 bg-slate-700 px-2 py-0.5 rounded">
+              {sceneName}
+            </span>
+          )}
+        </div>
+
+        <div className="mb-2">
+          <div
+            className="image-area border border-slate-600 rounded bg-slate-900 flex items-center justify-center relative cursor-pointer overflow-hidden"
+            style={{
+              width: '100%',
+              aspectRatio: project?.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9',
+              maxHeight: density === 'compact' ? '96px' : 'none'
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.dataTransfer.files.length > 0) {
+                handleImageDrop(shot.id, e.dataTransfer.files);
+              }
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              try {
+                if (shot.id) {
+                  handleImageUpload(shot.id);
+                }
+              } catch (error) {
+                console.error('Error handling image upload click:', error);
+              }
+            }}
+          >
+            {shotFrames.length > 0 ? (
+              <>
+                <img
+                  src={shotFrames[currentImageIndex.get(shot.id) || 0]?.image || shotFrames[0].image}
+                  alt={shot.shotCode}
+                  className="absolute inset-0 w-full h-full object-cover rounded"
+                  style={{ objectFit: 'cover' }}
+                />
+                {shotFrames.length > 1 && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs text-center py-0.5 z-10">
+                    {(currentImageIndex.get(shot.id) || 0) + 1}/{shotFrames.length}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-center text-slate-500 text-sm">
+                Drop image here or click to upload
+              </div>
+            )}
+          </div>
+          {shotFrames.length > 1 && (
+            <div className="flex items-center justify-center gap-1 mt-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const currentIdx = currentImageIndex.get(shot.id) || 0;
+                  const newIndex = currentIdx > 0 ? currentIdx - 1 : shotFrames.length - 1;
+                  setCurrentImageIndex((prev) => {
+                    const newMap = new Map(prev);
+                    newMap.set(shot.id, newIndex);
+                    return newMap;
+                  });
+                }}
+                className="p-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
+                title="Previous image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const currentIdx = currentImageIndex.get(shot.id) || 0;
+                  const newIndex = currentIdx < shotFrames.length - 1 ? currentIdx + 1 : 0;
+                  setCurrentImageIndex((prev) => {
+                    const newMap = new Map(prev);
+                    newMap.set(shot.id, newIndex);
+                    return newMap;
+                  });
+                }}
+                className="p-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
+                title="Next image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {density === 'detailed' && shot.scriptText && (
+          <div className="text-xs text-slate-400 mb-2 line-clamp-2">{shot.scriptText}</div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="w-full h-full flex flex-col bg-slate-900">
 
@@ -512,143 +698,100 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
         tabIndex={0}
         onClick={handleContainerClick}
       >
-        <div
-          className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-4`}
-        >
-          {sortedShots.map((shot, index) => {
-            const shotFrames = getShotFrames(shot.id);
-            const sceneName = getSceneName(shot.sceneId);
-            const isSelected = selectedShots.has(shot.id);
-            const isFocused = focusedIndex === index;
-            const canMoveUp = index > 0;
-            const canMoveDown = index < sortedShots.length - 1;
-            
-            return (
-              <div
-                key={shot.id}
-                data-card
-                data-shot-id={shot.id}
-                draggable
-                onDragStart={(e) => handleCardDragStart(e, shot.id)}
-                className={`rounded-lg border-2 cursor-move flex flex-col ${
-                  isSelected
-                    ? 'bg-slate-700 border-slate-400 shadow-md'
-                    : 'bg-slate-800 border-slate-600'
-                } ${isFocused ? 'ring-2 ring-slate-400' : ''} ${
-                  density === 'compact' ? 'p-2' : 'p-2 sm:p-4'
-                } transition-all ${
-                  dragShotId && shot.sceneId !== draggingSceneId ? 'opacity-30' : ''
-                } ${dragShotId === shot.id ? 'opacity-50' : ''}`}
-                onClick={(e) => handleCardClick(e, shot.id, index)}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="font-semibold text-sm text-slate-100">{shot.shotCode}</span>
-                  {sceneName && (
-                    <span className="text-xs text-slate-400 bg-slate-700 px-2 py-0.5 rounded">
-                      {sceneName}
-                    </span>
+        {groupByScene ? (
+          // Grouped by scene view
+          <div className="space-y-4">
+            {Array.from(shotsByScene.entries()).sort(([sceneIdA], [sceneIdB]) => {
+              // Sort scene entries by sceneNumber
+              if (sceneIdA === 'unassigned') return 1;
+              if (sceneIdB === 'unassigned') return -1;
+              const sceneA = scenes.find(s => s.id === sceneIdA);
+              const sceneB = scenes.find(s => s.id === sceneIdB);
+              const numA = sceneA ? (parseInt(sceneA.sceneNumber, 10) || 0) : 0;
+              const numB = sceneB ? (parseInt(sceneB.sceneNumber, 10) || 0) : 0;
+              return numA - numB;
+            }).map(([sceneId, sceneShots]) => {
+              const scene = scenes.find((s) => s.id === sceneId);
+              const isUnassigned = sceneId === 'unassigned';
+              const isExpanded = expandedScenes.has(sceneId);
+              const toggleExpanded = () => {
+                setExpandedScenes(prev => {
+                  const newSet = new Set(prev);
+                  if (newSet.has(sceneId)) {
+                    newSet.delete(sceneId);
+                  } else {
+                    newSet.add(sceneId);
+                  }
+                  return newSet;
+                });
+              };
+              
+              return (
+                <div key={sceneId} data-scene-id={sceneId} className="mb-4">
+                  {/* Scene Header */}
+                  <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 mb-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-1">
+                        {!isUnassigned && (
+                          <button
+                            onClick={toggleExpanded}
+                            className="flex-shrink-0 text-slate-400 hover:text-slate-200 transition-transform border-none outline-none focus:outline-none"
+                            style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                          >
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 12 12"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M4.5 2L8.5 6L4.5 10"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                        {isUnassigned ? (
+                          <span className="font-semibold text-sm text-slate-200">Unassigned</span>
+                        ) : (
+                          <span className="font-semibold text-sm text-slate-200">
+                            {scene ? `${scene.sceneNumber}: ${scene.title || `Scene ${scene.sceneNumber}`}` : `Scene ${sceneId}`}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-400">
+                          ({sceneShots.length} shots)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Scene Shots */}
+                  {isExpanded && (
+                    <div
+                      className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-4`}
+                    >
+                      {sceneShots.map((shot) => {
+                        const shotIndex = sortedShots.findIndex(s => s.id === shot.id);
+                        return renderShotCard(shot, shotIndex);
+                      })}
+                    </div>
                   )}
                 </div>
-
-                          <div className="mb-2">
-                            <div
-                              className="image-area border border-slate-600 rounded bg-slate-900 flex items-center justify-center relative cursor-pointer overflow-hidden"
-                              style={{
-                                width: '100%',
-                                aspectRatio: project?.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9',
-                                maxHeight: density === 'compact' ? '96px' : 'none'
-                              }}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (e.dataTransfer.files.length > 0) {
-                                  handleImageDrop(shot.id, e.dataTransfer.files);
-                                }
-                              }}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                try {
-                                  if (shot.id) {
-                                    handleImageUpload(shot.id);
-                                  }
-                                } catch (error) {
-                                  console.error('Error handling image upload click:', error);
-                                }
-                              }}
-                            >
-                              {shotFrames.length > 0 ? (
-                                <>
-                                  <img
-                                    src={shotFrames[currentImageIndex.get(shot.id) || 0]?.image || shotFrames[0].image}
-                                    alt={shot.shotCode}
-                                    className="absolute inset-0 w-full h-full object-cover rounded"
-                                    style={{ objectFit: 'cover' }}
-                                  />
-                                  {shotFrames.length > 1 && (
-                                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs text-center py-0.5 z-10">
-                                      {(currentImageIndex.get(shot.id) || 0) + 1}/{shotFrames.length}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <div className="absolute inset-0 flex items-center justify-center text-center text-slate-500 text-sm">
-                                  Drop image here or click to upload
-                                </div>
-                              )}
-                            </div>
-                            {shotFrames.length > 1 && (
-                              <div className="flex items-center justify-center gap-1 mt-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const currentIdx = currentImageIndex.get(shot.id) || 0;
-                                    const newIndex = currentIdx > 0 ? currentIdx - 1 : shotFrames.length - 1;
-                                    setCurrentImageIndex((prev) => {
-                                      const newMap = new Map(prev);
-                                      newMap.set(shot.id, newIndex);
-                                      return newMap;
-                                    });
-                                  }}
-                                  className="p-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
-                                  title="Previous image"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const currentIdx = currentImageIndex.get(shot.id) || 0;
-                                    const newIndex = currentIdx < shotFrames.length - 1 ? currentIdx + 1 : 0;
-                                    setCurrentImageIndex((prev) => {
-                                      const newMap = new Map(prev);
-                                      newMap.set(shot.id, newIndex);
-                                      return newMap;
-                                    });
-                                  }}
-                                  className="p-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
-                                  title="Next image"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                  </svg>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {density === 'detailed' && shot.scriptText && (
-                            <div className="text-xs text-slate-400 mb-2 line-clamp-2">{shot.scriptText}</div>
-                          )}
-                        </div>
-                    );
-                  })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          // Ungrouped view (original)
+          <div
+            className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-4`}
+          >
+            {sortedShots.map((shot, index) => renderShotCard(shot, index))}
+          </div>
+        )}
       </div>
 
       {/* Bottom Bar */}
@@ -712,6 +855,12 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
           )}
         </div>
         <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={() => setGroupByScene(!groupByScene)}
+            className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm hover:bg-slate-700"
+          >
+            {groupByScene ? 'Ungroup' : 'Group by Scene'}
+          </button>
           <button
             onClick={() => setDensity(density === 'compact' ? 'detailed' : 'compact')}
             className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm hover:bg-slate-700"

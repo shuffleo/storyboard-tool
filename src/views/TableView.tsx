@@ -393,23 +393,6 @@ export function TableView({ onSelect }: TableViewProps) {
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-900">
-      <div className="p-2 sm:p-4 border-b border-slate-700">
-        <button
-          onClick={() => {
-            const sceneId = createScene();
-            // Scroll to the new scene after a brief delay to allow DOM update
-            setTimeout(() => {
-              const element = document.querySelector(`[data-scene-id="${sceneId}"]`);
-              if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            }, 100);
-          }}
-          className="px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 text-xs sm:text-sm font-medium"
-        >
-          + Add Scene
-        </button>
-      </div>
 
       <input
         ref={fileInputRef}
@@ -499,7 +482,7 @@ export function TableView({ onSelect }: TableViewProps) {
                                     {!isUnassigned && (
                                       <button
                                         onClick={toggleExpanded}
-                                        className="flex-shrink-0 text-slate-400 hover:text-slate-200 transition-transform"
+                                        className="flex-shrink-0 text-slate-400 hover:text-slate-200 transition-transform border-0 outline-none focus:outline-none focus-visible:outline-none focus:border-0 active:border-0 ring-0 focus:ring-0 appearance-none bg-transparent p-0"
                                         style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
                                       >
                                         <svg
@@ -631,6 +614,21 @@ export function TableView({ onSelect }: TableViewProps) {
       {/* Bottom Bar */}
       <div className="p-2 sm:p-4 border-t border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 bg-slate-800">
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
+          <button
+            onClick={() => {
+              const sceneId = createScene();
+              // Scroll to the new scene after a brief delay to allow DOM update
+              setTimeout(() => {
+                const element = document.querySelector(`[data-scene-id="${sceneId}"]`);
+                if (element) {
+                  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }, 100);
+            }}
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 text-xs sm:text-sm font-medium"
+          >
+            + Add Scene
+          </button>
           {selectedRows.size > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs sm:text-sm text-slate-400">{selectedRows.size} selected</span>

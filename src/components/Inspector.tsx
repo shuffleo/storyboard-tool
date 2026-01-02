@@ -206,7 +206,7 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
         )}
         <button
           onClick={onClose}
-          className="text-slate-400 hover:text-slate-200 flex-shrink-0"
+          className="text-slate-400 hover:text-slate-200 flex-shrink-0 border-0 outline-none focus:outline-none focus-visible:outline-none focus:border-0 active:border-0 ring-0 focus:ring-0 appearance-none bg-transparent p-0"
         >
           ✕
         </button>

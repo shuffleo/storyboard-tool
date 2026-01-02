@@ -610,7 +610,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                   <h3 className="text-lg font-semibold text-slate-100">Project Details</h3>
                   <button
                     onClick={() => setProjectDetailsModalOpen(false)}
-                    className="text-slate-400 hover:text-slate-200 transition-colors"
+                    className="text-slate-400 hover:text-slate-200 transition-colors border-0 outline-none focus:outline-none focus-visible:outline-none focus:border-0 active:border-0 ring-0 focus:ring-0 appearance-none bg-transparent p-0"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
