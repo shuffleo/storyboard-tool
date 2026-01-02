@@ -62,6 +62,14 @@ function App() {
     document.title = `${projectTitle} - Storyboard Tool`;
   }, [project?.title]);
 
+  // Clear selection when switching to Animatics view (Inspector should be hidden by default)
+  useEffect(() => {
+    if (currentView === 'animatics') {
+      setSelectedId(null);
+      setSelectedType(null);
+    }
+  }, [currentView]);
+
   const handleSelect = useCallback((id: string, type: 'project' | 'scene' | 'shot' | 'frame') => {
       debugLogger.log('App', 'handleSelect called', { 
       id, 

@@ -184,7 +184,7 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
 
   return (
     <div className="w-80 bg-slate-800 border-l border-slate-700 flex flex-col h-full">
-      <div className="p-4 flex items-center justify-between gap-3 border-b border-slate-700" style={{ height: '70px' }}>
+      <div className="p-4 flex items-center justify-between gap-3" style={{ height: '70px' }}>
         {selectedType === 'shot' ? (
           <div className="flex items-center gap-3 flex-1">
             <h2 className="font-semibold text-slate-100 capitalize">Shot</h2>

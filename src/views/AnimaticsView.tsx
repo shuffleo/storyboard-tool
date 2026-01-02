@@ -181,20 +181,8 @@ export function AnimaticsView({ onSelect }: AnimaticsViewProps) {
     input.click();
   };
 
-  // Auto-select current shot (only when frame changes, not on every render)
-  useEffect(() => {
-    if (currentFrame && currentFrame.shotId && currentFrame.shot) {
-      try {
-        // Only update if shot ID actually changed to prevent infinite loops
-        if (selectedShotId !== currentFrame.shotId) {
-          setSelectedShotId(currentFrame.shotId);
-          onSelect(currentFrame.shotId, 'shot');
-        }
-      } catch (error) {
-        console.error('Error selecting shot:', error);
-      }
-    }
-  }, [currentFrame?.shotId, selectedShotId, onSelect]);
+  // Note: Removed auto-selection to keep Inspector hidden by default
+  // Inspector will only show when user explicitly clicks on a timeline frame
 
   // Playback: update currentTime based on elapsed real time
   useEffect(() => {

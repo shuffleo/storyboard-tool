@@ -491,6 +491,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-900">
+
       <input
         ref={fileInputRef}
         type="file"
@@ -512,7 +513,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
         onClick={handleContainerClick}
       >
         <div
-          className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 ${density === 'compact' ? 'lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'} gap-2 sm:gap-4`}
+          className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-4`}
         >
           {sortedShots.map((shot, index) => {
             const shotFrames = getShotFrames(shot.id);
@@ -650,14 +651,74 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
         </div>
       </div>
 
-      {/* Bottom bar with Compact toggle */}
-      <div className="p-2 sm:p-4 border-t border-slate-700 flex items-center justify-end">
-        <button
-          onClick={() => setDensity(density === 'compact' ? 'detailed' : 'compact')}
-          className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm hover:bg-slate-700"
-        >
-          {density === 'compact' ? 'Compact' : 'Detailed'}
-        </button>
+      {/* Bottom Bar */}
+      <div 
+        className="p-2 sm:p-4 border-t border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 bg-slate-800"
+        onClick={handleTopBarClick}
+      >
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
+          {selectedShots.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs sm:text-sm text-slate-400">{selectedShots.size} selected</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleMoveSelected('up')}
+                  className="p-1 text-slate-400 hover:text-slate-300"
+                  title="Move up (Cmd/Ctrl+↑)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleMoveSelected('down')}
+                  className="p-1 text-slate-400 hover:text-slate-300"
+                  title="Move down (Cmd/Ctrl+↓)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+              <select
+                onChange={(e) => {
+                  if (e.target.value.startsWith('scene:')) {
+                    handleBatchSceneChange(e.target.value.split(':')[1]);
+                  }
+                  e.target.value = '';
+                }}
+                className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm"
+                defaultValue=""
+              >
+                <option value="">Move to scene...</option>
+                <option value="scene:">Unassigned</option>
+                {sortedScenes.map((s) => (
+                  <option key={s.id} value={`scene:${s.id}`}>
+                    {s.sceneNumber}: {s.title || `Scene ${s.sceneNumber}`}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleBatchDelete}
+                className="px-2 sm:px-3 py-1 text-red-500 hover:bg-red-900/30 rounded text-xs sm:text-sm border border-red-600 hover:border-red-500 flex items-center gap-1"
+                title="Delete selected"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span className="hidden sm:inline">Delete</span>
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={() => setDensity(density === 'compact' ? 'detailed' : 'compact')}
+            className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm hover:bg-slate-700"
+          >
+            {density === 'compact' ? 'Compact' : 'Detailed'}
+          </button>
+        </div>
       </div>
     </div>
   );
