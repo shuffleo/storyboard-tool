@@ -1,6 +1,6 @@
 # Storyboard - Animation Pre-Production Tool
 
-A **local-first, lightweight web application** for managing and iterating on animation projects during pre-production and animatic stages.
+A **local-first, lightweight Progressive Web App (PWA)** for managing and iterating on animation projects during pre-production and animatic stages.
 
 ## Features
 
@@ -9,8 +9,9 @@ A **local-first, lightweight web application** for managing and iterating on ani
   - **Table View**: Spreadsheet-like editing with inline editing, scene grouping, compact mode, and bulk operations
   - **Storyboard View**: Card-based layout with multi-select, keyboard navigation, and image carousel (4 columns in compact mode)
   - **Animatics View**: Timeline-based playback with video player, Inspector panel, keyboard shortcuts, zoom controls, and frame editing
+- **Progressive Web App (PWA)**: Installable app that works offline with persistent storage protection
+- **Brutal Mode**: Bold, high-contrast design by default
 - **Shot Duration**: Each shot has a duration field (milliseconds, minimum 300ms) for animatics playback
-- **Dark Theme**: Modern dark UI throughout the application
 - **Local-First**: All data stored in IndexedDB, works fully offline
 - **Auto-save**: Continuous autosave on every change
 - **Import/Export**: JSON, CSV, ZIP (with images), PDF, IndexedDB, and image import support
@@ -45,6 +46,45 @@ npm run build
 ```
 
 The built files will be in the `dist` directory, ready for static hosting (GitHub Pages, Netlify, etc.).
+
+## Installing as a PWA
+
+This app can be installed as a Progressive Web App (PWA) on your device for a native app-like experience with offline support and better data protection.
+
+### Desktop (Chrome/Edge)
+
+1. Open the app in your browser
+2. Look for the install icon in the address bar (or click the three-dot menu)
+3. Click "Install" or "Install App" when prompted
+4. The app will be added to your applications and can be launched like a native app
+
+### Desktop (Firefox)
+
+1. Open the app in Firefox
+2. Click the three-dot menu (⋮) in the top bar
+3. Select "Install App" from the menu
+4. Confirm the installation
+
+### Mobile (iOS Safari)
+
+1. Open the app in Safari
+2. Tap the Share button (square with arrow)
+3. Scroll down and tap "Add to Home Screen"
+4. Tap "Add" to confirm
+
+### Mobile (Android Chrome)
+
+1. Open the app in Chrome
+2. Tap the three-dot menu
+3. Select "Install app" or "Add to Home screen"
+4. Confirm the installation
+
+### Benefits of Installing
+
+- **Offline Access**: Works without internet connection
+- **Persistent Storage**: Better data protection against browser data clearing
+- **App-like Experience**: Launches in its own window, no browser UI
+- **Home Screen Access**: Quick access from your device's home screen
 
 ## Usage
 
