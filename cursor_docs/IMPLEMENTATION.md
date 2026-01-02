@@ -531,13 +531,11 @@ src/
 ## Import/Export
 
 ### Export Formats
-- **JSON**: Full project data (no images)
 - **ZIP**: Full project data with all images included (recommended for backups)
 - **CSV**: Shot list only
 - **PDF**: Storyboard sheets
 
 ### Import Formats
-- **JSON**: Project data (no images)
 - **ZIP**: Project data with images (extracts images from ZIP and restores them)
 - **CSV**: Shot list import
 - **Images**: Multiple images imported as separate shots in Scene 0

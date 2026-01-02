@@ -4,18 +4,12 @@ A **local-first, lightweight Progressive Web App (PWA)** for managing and iterat
 
 ## Features
 
-- **Single Source of Truth**: Edit once, see everywhere - all views are strictly synchronized
-- **Three Synchronized Views**:
-  - **Table View**: Spreadsheet-like editing with inline editing, scene grouping, compact mode, and bulk operations
-  - **Storyboard View**: Card-based layout with multi-select, keyboard navigation, and image carousel (4 columns in compact mode)
-  - **Animatics View**: Timeline-based playback with video player, Inspector panel, keyboard shortcuts, zoom controls, and frame editing
-- **Progressive Web App (PWA)**: Installable app that works offline with persistent storage protection
-- **Brutal Mode**: Bold, high-contrast design by default
-- **Shot Duration**: Each shot has a duration field (milliseconds, minimum 300ms) for animatics playback
-- **Local-First**: All data stored in IndexedDB, works fully offline
-- **Auto-save**: Continuous autosave on every change
-- **Import/Export**: JSON, CSV, ZIP (with images), PDF, IndexedDB, and image import support
-- **No Backend**: Runs entirely in the browser, perfect for GitHub Pages or local use
+- **Three Synchronized Views**: Table (spreadsheet editing), Storyboard (visual cards), and Animatics (timeline playback) - all stay in sync
+- **Progressive Web App**: Installable, works offline with persistent storage protection
+- **Local-First**: All data stored in IndexedDB, auto-saves continuously, no backend required
+- **Import/Export**: Multiple formats (CSV, ZIP, PDF, IndexedDB) with full data preservation
+- **Animatics Playback**: Timeline-based video preview with duration controls and WebM export
+- **Brutalist Design**: Bold, high-contrast interface 
 
 ## Tech Stack
 
@@ -25,59 +19,15 @@ A **local-first, lightweight Progressive Web App (PWA)** for managing and iterat
 - IndexedDB for persistence
 - Tailwind CSS for styling
 
-## Getting Started
 
-### Installation
-
-```bash
-npm install
-```
-
-### Development
-
-```bash
-npm run dev
-```
-
-### Build
-
-```bash
-npm run build
-```
-
-The built files will be in the `dist` directory, ready for static hosting (GitHub Pages, Netlify, etc.).
-
-## Installing as a PWA
+## Installing as a PWA on Desktop (Chrome/Edge)
 
 This app can be installed as a Progressive Web App (PWA) on your device for a native app-like experience with offline support and better data protection.
-
-### Desktop (Chrome/Edge)
 
 1. Open the app in your browser
 2. Look for the install icon in the address bar (or click the three-dot menu)
 3. Click "Install" or "Install App" when prompted
 4. The app will be added to your applications and can be launched like a native app
-
-### Desktop (Firefox)
-
-1. Open the app in Firefox
-2. Click the three-dot menu (⋮) in the top bar
-3. Select "Install App" from the menu
-4. Confirm the installation
-
-### Mobile (iOS Safari)
-
-1. Open the app in Safari
-2. Tap the Share button (square with arrow)
-3. Scroll down and tap "Add to Home Screen"
-4. Tap "Add" to confirm
-
-### Mobile (Android Chrome)
-
-1. Open the app in Chrome
-2. Tap the three-dot menu
-3. Select "Install app" or "Add to Home screen"
-4. Confirm the installation
 
 ### Benefits of Installing
 
@@ -103,39 +53,30 @@ When you first open the app, a default project is created with 3 scenes, each co
 - Click "+ Add Scene" in the Table view
 - New scenes automatically get at least one shot created
 - Assign shots to scenes using the Scene dropdown in the table
-- When deleting the last shot in a scene, you'll be asked if you want to delete the scene as well
 
 ### Storyboard Frames
 
 - Drag and drop images onto shot cards in the Storyboard view
-- Or use the Inspector to add frames to a selected shot
 - Multiple frames per shot are supported
 
-### Reordering Shots
-
-- **Table View**: Use arrow buttons or multi-select with Cmd/Ctrl+Arrow keys
-- **Storyboard View**: Drag and drop cards to reorder (cards from other scenes are dimmed), or use arrow buttons/multi-select with Cmd/Ctrl+Arrow keys
-- **Animatics View**: Drag shots on timeline to reorder (shots from other scenes are dimmed)
-- Shots are automatically sorted by scene (low to high) and within each scene by order (low to high)
-- When dragging, shots from other scenes are dimmed to indicate you can only reorder within the same scene
 
 ### Views
 
 - **Table**: Best for detailed editing, bulk operations, and data entry. Features compact mode toggle (text button), scene grouping, inline editing, and auto-resizing textareas. Columns: Shot, Thumbnail, Script, General Notes.
 - **Storyboard**: Best for visual review and quick reordering. Features multi-select, keyboard navigation, and image carousel.
+- **Animatics**: Preview your storyboard as a timed animatic, adjust shot durations, zoom on the timeline, and export to video.
+
 
 ### Import/Export
 
-- **Import**: JSON, CSV, ZIP, or Images from the Import menu
-  - All imports ask: "Replace all existing content?" (OK = replace, Cancel = add to existing)
+- **Import**: CSV, ZIP, IndexedDB, or Images from the Import menu
   - ZIP import includes images from the exported ZIP file
 - **Export**: 
-  - **ZIP** (recommended): Full backup with all images included
-  - **JSON**: Full backup (no images)
+  - **IndexedDB** (recommended): Complete database backup
+  - **ZIP**: Full backup with all images included
   - **CSV**: Shot list only
-  - **PDF**: Storyboard sheets
-  - **IndexedDB**: Complete database backup
-  - **WebM Video**: Export animatics as video (available from all views)
+  - **PDF**: Export as storyboard sheets
+  - **WebM Video**: Export animatics as video
 - **Delete All Content**: Available in three-dot menu with confirmation dialog. Options: Delete All Content, Export and Delete All Content, Cancel
 
 ## Data Model
@@ -159,62 +100,8 @@ All data is stored locally in IndexedDB. The canonical data structure includes:
 - **Cmd/Ctrl+Click**: Multi-select shots (Storyboard view)
 - **Shift+Click**: Range select shots (Storyboard view)
 
-## UI Features
-
-### Auto-Resizing Text Fields
-- Script and General Notes textareas automatically grow to fit content
-- Minimum height of 4rem, expands as you type
-- Prevents text fields from shrinking when clicked
-
-### Delete Shot/Scene
-- Deleting the last shot in a scene shows a dialog with options:
-  - Delete row only
-  - Delete row and scene
-  - Cancel
-- Deleting other shots shows a simple confirmation
-
-### Compact Mode
-- Toggle between Compact and Detailed views in Table view
-- Text button toggle (matches StoryboardView style)
-- Hides checkbox, arrow buttons, and actions columns in compact mode
-- Actions column heading is hidden (column exists but heading is empty)
-
-### Inspector Panel
-- **Shot Code**: Editable in header next to "Shot" label (removed from body)
-- **Image Carousel**: Shows all images for a shot with navigation, delete, and "Set as main" functionality
-- **Close Button**: Hidden in Animatics view, visible in Table and Storyboard views
-- **Padding**: Proper spacing between close button and shot code field
-- **Scene Dropdown**: 4px margin on dropdown arrow for better spacing
-
-### Debug Mode
-- Toggle Debug Mode from the three-dot menu in the top bar
-- When enabled, a debug panel appears at the bottom of the screen
-- Shows verbose logs with timestamps, categories, and error details
-- Always visible (rendered via React Portal) even if the main app crashes
-- Auto-scroll option and clear logs button available
-
-### Animatics View
-- **Timeline Zoom**: Zoom in/out controls (50%-500%) with synchronized time ruler and timeline
-- **Duration Editing**: Drag handles at shot edges to adjust duration (hover to show)
-- **Shot Reordering**: Drag shots on timeline to reorder (within same scene)
-- **Image Error Handling**: Corrupted images show error message with option to upload new image
-- **Video Restart**: Clicking play at the end restarts from beginning
-- **Keyboard Shortcuts**: Spacebar to play/pause, arrow keys to navigate frames
-- **Scrollbar Sync**: Time ruler and timeline share synchronized scrolling (only one visible scrollbar)
-- **Click Safety**: All click handlers validated to prevent blank screen crashes
-
-## Performance
-
-Optimized for:
-- ~500 shots
-- ~2,000 storyboard frames
-- Lazy-loaded thumbnails
-- Efficient IndexedDB queries
 
 ## Browser Support
 
 Modern browsers with IndexedDB support:
 - Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (latest)
-

@@ -51,9 +51,9 @@ So the full path would be something like:
 
 ### Method 1: Export from the App (Recommended)
 1. Open the Storyboard app
-2. Click **Export** → **JSON**
-3. This downloads a readable JSON file with all your project data
-4. You can open this JSON file in any text editor
+2. Click **Export** → **IndexedDB** or **ZIP**
+3. This downloads a complete backup file with all your project data
+4. IndexedDB format is JSON and can be opened in any text editor
 
 ### Method 2: Browser DevTools
 1. Open the app in your browser
@@ -72,8 +72,7 @@ So the full path would be something like:
 ## Backup Your Data
 
 **Always use the Export feature** to create backups:
-- Export to JSON for full backup
-- Export to IndexedDB for complete database backup
+- Export to IndexedDB for complete database backup (JSON format)
 - Export to ZIP for full backup with images included
 - Export to CSV for shot list
 - Export to PDF for storyboard sheets
@@ -99,10 +98,10 @@ The exported JSON contains:
 2. Or use the Export feature to backup, then clear browser data
 
 ### Want to move data to another computer?
-1. Export to ZIP (includes images), IndexedDB, or JSON on the old computer
-2. Import ZIP, IndexedDB, or JSON on the new computer
+1. Export to ZIP (includes images) or IndexedDB on the old computer
+2. Import ZIP or IndexedDB on the new computer
 3. ZIP format is recommended as it includes all images in a single file
-4. IndexedDB format provides a complete database backup
+4. IndexedDB format provides a complete database backup (JSON format)
 
 ## Technical Details
 

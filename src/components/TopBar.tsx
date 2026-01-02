@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ViewType } from '../App';
 import { useStore } from '../store/useStore';
-import { exportToJSON, exportToCSV, exportStoryboardPDF, exportToZIP, exportAnimaticsToMP4, downloadFile, importFromJSON, importFromCSV, importFromZIP, importImages, exportIndexedDB, importIndexedDB } from '../utils/importExport';
+import { exportToCSV, exportStoryboardPDF, exportToZIP, exportAnimaticsToMP4, downloadFile, importFromCSV, importFromZIP, importImages, exportIndexedDB, importIndexedDB } from '../utils/importExport';
 import { debugLogger } from '../utils/debug';
 
 interface TopBarProps {
@@ -25,6 +25,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [debugMode, setDebugMode] = useState(debugLogger.isEnabled());
+  const [isExportingWebM, setIsExportingWebM] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -52,14 +53,6 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
     return `${minutes}m ago`;
   };
 
-  const handleExportJSON = async () => {
-    if (!project) return;
-    const json = await exportToJSON();
-    downloadFile(json, `${project.title}.json`, 'application/json');
-    setExportModalOpen(false);
-    setMenuOpen(false);
-  };
-
   const handleExportCSV = async () => {
     if (!project) return;
     const csv = await exportToCSV();
@@ -83,30 +76,16 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
 
   const handleExportMP4 = async () => {
     if (!project) return;
+    setIsExportingWebM(true);
     try {
       await exportAnimaticsToMP4();
       setExportModalOpen(false);
       setMenuOpen(false);
     } catch (error) {
-      alert(`Failed to export MP4: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(`Failed to export WebM: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExportingWebM(false);
     }
-  };
-
-  const handleImportJSON = async () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const replace = confirm('Replace all existing content? Click OK to replace, Cancel to add to existing content.');
-        const text = await file.text();
-        await importFromJSON(text, replace);
-      }
-    };
-    input.click();
-    setImportModalOpen(false);
-    setMenuOpen(false);
   };
 
   const handleImportCSV = async () => {
@@ -491,9 +470,6 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                   <h3 className="text-lg font-semibold text-slate-100">Import</h3>
                 </div>
                 <div className="p-2">
-                  <button onClick={handleImportJSON} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
-                    JSON
-                  </button>
                   <button onClick={handleImportCSV} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     CSV
                   </button>
@@ -527,9 +503,6 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                   <h3 className="text-lg font-semibold text-slate-100">Export</h3>
                 </div>
                 <div className="p-2">
-                  <button onClick={handleExportJSON} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
-                    JSON
-                  </button>
                   <button onClick={handleExportCSV} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     CSV
                   </button>
@@ -542,8 +515,22 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                   <button onClick={handleExportIndexedDB} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
                     IndexedDB
                   </button>
-                  <button onClick={handleExportMP4} className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded">
-                    WebM Video
+                  <button 
+                    onClick={handleExportMP4} 
+                    disabled={isExportingWebM}
+                    className={`block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded ${isExportingWebM ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isExportingWebM ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Generating WebM...
+                      </span>
+                    ) : (
+                      'WebM Video'
+                    )}
                   </button>
                 </div>
                 <div className="p-4 border-t border-slate-700">
