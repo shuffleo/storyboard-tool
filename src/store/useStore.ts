@@ -126,10 +126,7 @@ export const useStore = create<Store>((set, get) => ({
               shotCode,
               scriptText: '',
               duration: 500, // Default 500ms
-              status: 'todo',
               tags: [],
-              cameraNotes: '',
-              animationNotes: '',
               generalNotes: '',
             };
             defaultShots.push(shot);
@@ -369,10 +366,7 @@ export const useStore = create<Store>((set, get) => ({
       shotCode,
       scriptText: '',
       duration: 500, // Default 500ms
-      status: 'todo',
       tags: [],
-      cameraNotes: '',
-      animationNotes: '',
       generalNotes: '',
     };
     set((s) => ({
@@ -478,8 +472,6 @@ export const useStore = create<Store>((set, get) => ({
       scriptText: shots.map(s => s.scriptText).join('\n\n'),
       duration: shots.reduce((sum, s) => sum + s.duration, 0),
       tags: [...new Set(shots.flatMap(s => s.tags))],
-      cameraNotes: shots.map(s => s.cameraNotes).filter(Boolean).join('\n\n'),
-      animationNotes: shots.map(s => s.animationNotes).filter(Boolean).join('\n\n'),
       generalNotes: shots.map(s => s.generalNotes).filter(Boolean).join('\n\n'),
     };
     
@@ -614,10 +606,7 @@ export const useStore = create<Store>((set, get) => ({
           shotCode,
           scriptText: '',
           duration: 1000,
-          status: 'todo',
           tags: [],
-          cameraNotes: '',
-          animationNotes: '',
           generalNotes: '',
         };
         defaultShots.push(shot);

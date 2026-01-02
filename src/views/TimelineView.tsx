@@ -129,15 +129,7 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
                           }}
                         >
                           <div
-                            className={`h-24 border-2 rounded ${
-                              shot.status === 'todo'
-                                ? 'border-slate-600 bg-slate-800'
-                                : shot.status === 'boarded'
-                                ? 'border-yellow-400 bg-yellow-50'
-                                : shot.status === 'animated'
-                                ? 'border-green-400 bg-green-50'
-                                : 'border-red-600 bg-red-900/30'
-                            } cursor-pointer hover:shadow-md transition-shadow flex flex-col`}
+                            className="h-24 border-2 rounded border-slate-600 bg-slate-800 cursor-pointer hover:shadow-md transition-shadow flex flex-col"
                             onClick={() => onSelect(shot.id, 'shot')}
                           >
                             {shotFrames.length > 0 ? (

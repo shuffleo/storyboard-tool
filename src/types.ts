@@ -1,7 +1,5 @@
 // Canonical data model - single source of truth
 
-export type ShotStatus = 'todo' | 'boarded' | 'animated' | 'needs-review';
-
 export interface Project {
   id: string;
   title: string;
@@ -39,10 +37,7 @@ export interface Shot {
   shotCode: string; // e.g. "010", "020", "030"
   scriptText: string;
   duration: number; // milliseconds, minimum 300ms
-  status: ShotStatus;
   tags: string[];
-  cameraNotes: string;
-  animationNotes: string;
   generalNotes: string;
 }
 

@@ -45,7 +45,7 @@ export async function importFromJSON(json: string, replace: boolean = true): Pro
 export async function exportToCSV(): Promise<string> {
   const state = useStore.getState();
 
-  const headers = ['Shot Code', 'Scene', 'Script Text', 'Duration', 'Status', 'Tags'];
+  const headers = ['Shot Code', 'Scene', 'Script Text', 'Duration', 'Tags'];
   const rows = state.shots
     .sort((a, b) => a.orderIndex - b.orderIndex)
     .map((shot) => {
@@ -55,7 +55,6 @@ export async function exportToCSV(): Promise<string> {
         scene ? `Scene ${scene.sceneNumber}` : '',
         `"${shot.scriptText.replace(/"/g, '""')}"`,
         (shot.duration / 1000).toString(), // Convert ms to seconds for CSV
-        shot.status,
         shot.tags.join('; '),
       ];
     });
@@ -72,7 +71,6 @@ export async function importFromCSV(csv: string, replace: boolean = true): Promi
   const sceneIndex = headers.indexOf('Scene');
   const scriptIndex = headers.indexOf('Script Text');
   const durationIndex = headers.indexOf('Duration');
-  const statusIndex = headers.indexOf('Status');
   const tagsIndex = headers.indexOf('Tags');
 
   if (shotCodeIndex === -1) throw new Error('Missing "Shot Code" column');
@@ -124,7 +122,6 @@ export async function importFromCSV(csv: string, replace: boolean = true): Promi
       shotCode: values[shotCodeIndex] || shot.shotCode,
       scriptText: values[scriptIndex] || '',
       duration: Math.max(300, (parseFloat(values[durationIndex]) || 1) * 1000), // Convert seconds to ms, min 300ms
-      status: (values[statusIndex] as any) || 'todo',
       tags: values[tagsIndex] ? values[tagsIndex].split(';').map((t) => t.trim()) : [],
       sceneId,
     });
