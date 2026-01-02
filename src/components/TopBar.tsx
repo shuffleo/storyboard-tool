@@ -24,6 +24,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
+  const [projectDetailsModalOpen, setProjectDetailsModalOpen] = useState(false);
   const [debugMode, setDebugMode] = useState(debugLogger.isEnabled());
   const [isExportingWebM, setIsExportingWebM] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -419,6 +420,15 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                 >
                   Export
                 </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setProjectDetailsModalOpen(true);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                >
+                  Project Details
+                </button>
                 {showInstallPrompt && (
                   <button
                     onClick={() => {
@@ -451,7 +461,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                 >
                   Delete All Content
                 </button>
-                <div className="px-4 py-2 text-xs sm:text-sm text-slate-400 border-t border-slate-700 mt-1">
+                <div className="px-4 py-2 text-xs sm:text-sm text-slate-400 mt-1">
                   {isSaving ? (
                     <span>Last save: Saving...</span>
                   ) : (
@@ -586,6 +596,135 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                     className="w-full px-4 py-2 text-sm text-slate-200 bg-slate-700 hover:bg-slate-600 rounded"
                   >
                     Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Project Details Modal */}
+          {projectDetailsModalOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto modal-content">
+                <div className="p-4 border-b border-slate-700">
+                  <h3 className="text-lg font-semibold text-slate-100">Project Details</h3>
+                </div>
+                <div className="p-4 space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Title</label>
+                    <input
+                      type="text"
+                      value={project?.title || ''}
+                      onChange={(e) => updateProject({ title: e.target.value })}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                          return;
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">FPS</label>
+                      <input
+                        type="number"
+                        value={project?.fps || 24}
+                        onChange={(e) => updateProject({ fps: Number(e.target.value) })}
+                        onKeyDown={(e) => {
+                          if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                            return;
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Aspect Ratio</label>
+                      <input
+                        type="text"
+                        value={project?.aspectRatio || '16:9'}
+                        onChange={(e) => updateProject({ aspectRatio: e.target.value })}
+                        onKeyDown={(e) => {
+                          if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                            return;
+                          }
+                        }}
+                        placeholder="e.g., 16:9, 4:3"
+                        className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Target Duration (seconds, optional)</label>
+                    <input
+                      type="number"
+                      value={project?.targetDuration || ''}
+                      onChange={(e) => updateProject({ targetDuration: e.target.value ? Number(e.target.value) : undefined })}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                          return;
+                        }
+                      }}
+                      placeholder="Optional"
+                      className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Style Notes</label>
+                    <textarea
+                      value={project?.styleNotes || ''}
+                      onChange={(e) => updateProject({ styleNotes: e.target.value })}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                          return;
+                        }
+                      }}
+                      rows={4}
+                      placeholder="Enter style notes..."
+                      className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Reference Links (one per line)</label>
+                    <textarea
+                      value={project?.referenceLinks?.join('\n') || ''}
+                      onChange={(e) => {
+                        const links = e.target.value.split('\n').filter(link => link.trim() !== '');
+                        updateProject({ referenceLinks: links });
+                      }}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                          return;
+                        }
+                      }}
+                      rows={3}
+                      placeholder="Enter reference links, one per line..."
+                      className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Global Notes</label>
+                    <textarea
+                      value={project?.globalNotes || ''}
+                      onChange={(e) => updateProject({ globalNotes: e.target.value })}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                          return;
+                        }
+                      }}
+                      rows={6}
+                      placeholder="Enter global notes..."
+                      className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    />
+                  </div>
+                </div>
+                <div className="p-4 border-t border-slate-700">
+                  <button
+                    onClick={() => setProjectDetailsModalOpen(false)}
+                    className="w-full px-4 py-2 text-sm text-slate-200 bg-slate-700 hover:bg-slate-600 rounded"
+                  >
+                    Close
                   </button>
                 </div>
               </div>
