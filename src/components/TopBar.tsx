@@ -606,8 +606,22 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
           {projectDetailsModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto modal-content">
-                <div className="p-4 border-b border-slate-700">
+                <div className="p-4 border-b border-slate-700 flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-slate-100">Project Details</h3>
+                  <button
+                    onClick={() => setProjectDetailsModalOpen(false)}
+                    className="text-slate-400 hover:text-slate-200 transition-colors"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
                 <div className="p-4 space-y-4">
                   <div>
@@ -627,32 +641,36 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">FPS</label>
-                      <input
-                        type="number"
+                      <select
                         value={project?.fps || 24}
                         onChange={(e) => updateProject({ fps: Number(e.target.value) })}
-                        onKeyDown={(e) => {
-                          if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
-                            return;
-                          }
-                        }}
                         className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
-                      />
+                      >
+                        <option value={12}>12 fps</option>
+                        <option value={24}>24 fps</option>
+                        <option value={25}>25 fps</option>
+                        <option value={30}>30 fps</option>
+                        <option value={48}>48 fps</option>
+                        <option value={50}>50 fps</option>
+                        <option value={60}>60 fps</option>
+                        <option value={120}>120 fps</option>
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Aspect Ratio</label>
-                      <input
-                        type="text"
+                      <select
                         value={project?.aspectRatio || '16:9'}
                         onChange={(e) => updateProject({ aspectRatio: e.target.value })}
-                        onKeyDown={(e) => {
-                          if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
-                            return;
-                          }
-                        }}
-                        placeholder="e.g., 16:9, 4:3"
                         className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
-                      />
+                      >
+                        <option value="16:9">16:9 (Widescreen)</option>
+                        <option value="4:3">4:3 (Standard)</option>
+                        <option value="21:9">21:9 (Ultrawide)</option>
+                        <option value="1:1">1:1 (Square)</option>
+                        <option value="9:16">9:16 (Portrait)</option>
+                        <option value="3:2">3:2 (Classic)</option>
+                        <option value="5:4">5:4 (Traditional)</option>
+                      </select>
                     </div>
                   </div>
                   <div>
@@ -718,14 +736,6 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                       className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
                     />
                   </div>
-                </div>
-                <div className="p-4 border-t border-slate-700">
-                  <button
-                    onClick={() => setProjectDetailsModalOpen(false)}
-                    className="w-full px-4 py-2 text-sm text-slate-200 bg-slate-700 hover:bg-slate-600 rounded"
-                  >
-                    Close
-                  </button>
                 </div>
               </div>
             </div>

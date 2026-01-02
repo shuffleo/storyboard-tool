@@ -10,24 +10,16 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   const shots = useStore((state) => state.shots);
   const frames = useStore((state) => state.frames);
   const scenes = useStore((state) => state.scenes);
+  const project = useStore((state) => state.project);
   const reorderShots = useStore((state) => state.reorderShots);
   const addFrame = useStore((state) => state.addFrame);
   const deleteShot = useStore((state) => state.deleteShot);
   const bulkUpdateShots = useStore((state) => state.bulkUpdateShots);
-  // Persistent layout and density preferences
-  const [layout, setLayout] = useState<'grid' | 'list'>(() => {
-    const saved = localStorage.getItem('storyboardLayout');
-    return (saved === 'grid' || saved === 'list') ? saved : 'grid';
-  });
+  // Persistent density preferences
   const [density, setDensity] = useState<'compact' | 'detailed'>(() => {
     const saved = localStorage.getItem('storyboardDensity');
     return (saved === 'compact' || saved === 'detailed') ? saved : 'detailed';
   });
-  
-  // Persist layout changes
-  useEffect(() => {
-    localStorage.setItem('storyboardLayout', layout);
-  }, [layout]);
   
   // Persist density changes
   useEffect(() => {
@@ -499,81 +491,6 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-900">
-      <div 
-        className="p-2 sm:p-4 border-b border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 bg-slate-800"
-        onClick={handleTopBarClick}
-      >
-        <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
-          {selectedShots.size > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs sm:text-sm text-slate-400">{selectedShots.size} selected</span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleMoveSelected('up')}
-                  className="p-1 text-slate-400 hover:text-slate-300"
-                  title="Move up (Cmd/Ctrl+↑)"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => handleMoveSelected('down')}
-                  className="p-1 text-slate-400 hover:text-slate-300"
-                  title="Move down (Cmd/Ctrl+↓)"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
-              <select
-                onChange={(e) => {
-                  if (e.target.value.startsWith('scene:')) {
-                    handleBatchSceneChange(e.target.value.split(':')[1]);
-                  }
-                  e.target.value = '';
-                }}
-                className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm"
-                defaultValue=""
-              >
-                <option value="">Move to scene...</option>
-                <option value="scene:">Unassigned</option>
-                {sortedScenes.map((s) => (
-                  <option key={s.id} value={`scene:${s.id}`}>
-                    {s.sceneNumber}: {s.title || `Scene ${s.sceneNumber}`}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handleBatchDelete}
-                className="px-2 sm:px-3 py-1 text-red-500 hover:bg-red-900/30 rounded text-xs sm:text-sm border border-red-600 hover:border-red-500 flex items-center gap-1"
-                title="Delete selected"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                <span className="hidden sm:inline">Delete</span>
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => setLayout(layout === 'grid' ? 'list' : 'grid')}
-            className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm hover:bg-slate-700"
-          >
-            {layout === 'grid' ? 'List' : 'Grid'}
-          </button>
-          <button
-            onClick={() => setDensity(density === 'compact' ? 'detailed' : 'compact')}
-            className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm hover:bg-slate-700"
-          >
-            {density === 'compact' ? 'Compact' : 'Detailed'}
-          </button>
-        </div>
-      </div>
-
       <input
         ref={fileInputRef}
         type="file"
@@ -595,7 +512,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
         onClick={handleContainerClick}
       >
         <div
-          className={layout === 'grid' ? `grid grid-cols-1 sm:grid-cols-2 ${density === 'compact' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-2 sm:gap-4` : 'flex flex-col gap-2 sm:gap-4'}
+          className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 ${density === 'compact' ? 'lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6' : 'lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'} gap-2 sm:gap-4`}
         >
           {sortedShots.map((shot, index) => {
             const shotFrames = getShotFrames(shot.id);
@@ -612,7 +529,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                 data-shot-id={shot.id}
                 draggable
                 onDragStart={(e) => handleCardDragStart(e, shot.id)}
-                className={`rounded-lg border-2 cursor-move ${
+                className={`rounded-lg border-2 cursor-move flex flex-col ${
                   isSelected
                     ? 'bg-slate-700 border-slate-400 shadow-md'
                     : 'bg-slate-800 border-slate-600'
@@ -623,50 +540,23 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                 } ${dragShotId === shot.id ? 'opacity-50' : ''}`}
                 onClick={(e) => handleCardClick(e, shot.id, index)}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col gap-0.5">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMoveShot(shot.id, 'up');
-                        }}
-                        disabled={!canMoveUp}
-                        className="p-0.5 text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Move up"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleMoveShot(shot.id, 'down');
-                        }}
-                        disabled={!canMoveDown}
-                        className="p-0.5 text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Move down"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                    </div>
-                              <span className="font-semibold text-sm text-slate-100">{shot.shotCode}</span>
-                              {sceneName && (
-                                <span className="text-xs text-slate-400 bg-slate-700 px-2 py-0.5 rounded">
-                                  {sceneName}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-semibold text-sm text-slate-100">{shot.shotCode}</span>
+                  {sceneName && (
+                    <span className="text-xs text-slate-400 bg-slate-700 px-2 py-0.5 rounded">
+                      {sceneName}
+                    </span>
+                  )}
+                </div>
 
                           <div className="mb-2">
                             <div
-                              className={`image-area ${
-                                density === 'compact' ? 'h-24' : 'h-48'
-                              } border border-slate-600 rounded bg-slate-900 flex items-center justify-center relative cursor-pointer`}
+                              className="image-area border border-slate-600 rounded bg-slate-900 flex items-center justify-center relative cursor-pointer overflow-hidden"
+                              style={{
+                                width: '100%',
+                                aspectRatio: project?.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9',
+                                maxHeight: density === 'compact' ? '96px' : 'none'
+                              }}
                               onDrop={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -694,16 +584,17 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                                   <img
                                     src={shotFrames[currentImageIndex.get(shot.id) || 0]?.image || shotFrames[0].image}
                                     alt={shot.shotCode}
-                                    className="w-full h-full object-contain rounded"
+                                    className="absolute inset-0 w-full h-full object-cover rounded"
+                                    style={{ objectFit: 'cover' }}
                                   />
                                   {shotFrames.length > 1 && (
-                                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs text-center py-0.5">
+                                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs text-center py-0.5 z-10">
                                       {(currentImageIndex.get(shot.id) || 0) + 1}/{shotFrames.length}
                                     </div>
                                   )}
                                 </>
                               ) : (
-                                <div className="text-center text-slate-500 text-sm">
+                                <div className="absolute inset-0 flex items-center justify-center text-center text-slate-500 text-sm">
                                   Drop image here or click to upload
                                 </div>
                               )}
@@ -757,6 +648,16 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                     );
                   })}
         </div>
+      </div>
+
+      {/* Bottom bar with Compact toggle */}
+      <div className="p-2 sm:p-4 border-t border-slate-700 flex items-center justify-end">
+        <button
+          onClick={() => setDensity(density === 'compact' ? 'detailed' : 'compact')}
+          className="px-2 sm:px-3 py-1 border border-slate-600 bg-slate-800 text-slate-200 rounded text-xs sm:text-sm hover:bg-slate-700"
+        >
+          {density === 'compact' ? 'Compact' : 'Detailed'}
+        </button>
       </div>
     </div>
   );
