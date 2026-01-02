@@ -127,25 +127,6 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
     return `${scene.sceneNumber}: ${title}`;
   };
 
-  /**
-   * CRITICAL: Reordering function - DO NOT REMOVE
-   * Moves a shot up or down in the order and updates shot codes automatically.
-   * This replaces drag-and-drop functionality.
-   * The reorderShots function in the store automatically recalculates shot codes.
-   */
-  const handleMoveShot = (shotId: string, direction: 'up' | 'down') => {
-    const currentIndex = sortedShots.findIndex((s) => s.id === shotId);
-    if (currentIndex === -1) return;
-    
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= sortedShots.length) return;
-    
-    const newOrder = Array.from(sortedShots.map((s) => s.id));
-    const [removed] = newOrder.splice(currentIndex, 1);
-    newOrder.splice(newIndex, 0, removed);
-    // This automatically updates shot codes based on new order
-    reorderShots(newOrder);
-  };
 
   const handleImageDrop = (shotId: string, files: FileList) => {
     Array.from(files).forEach((file) => {
@@ -546,8 +527,6 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
     const sceneName = getSceneName(shot.sceneId);
     const isSelected = selectedShots.has(shot.id);
     const isFocused = focusedIndex === index;
-    const canMoveUp = index > 0;
-    const canMoveDown = index < sortedShots.length - 1;
     
     return (
       <div
