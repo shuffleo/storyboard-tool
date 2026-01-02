@@ -25,9 +25,10 @@ A **local-first, lightweight Progressive Web App (PWA)** for managing and iterat
 This app can be installed as a Progressive Web App (PWA) on your device for a native app-like experience with offline support and better data protection.
 
 1. Open the app in your browser
-2. Look for the install icon in the address bar (or click the three-dot menu)
-3. Click "Install" or "Install App" when prompted
-4. The app will be added to your applications and can be launched like a native app
+2. Click the three-dot menu (⋯) in the top bar
+3. Click "Install App" from the menu
+4. Follow the browser's installation prompt
+5. The app will be added to your applications and can be launched like a native app
 
 ### Benefits of Installing
 
