@@ -59,7 +59,7 @@ function App() {
   // Update document title with project name
   useEffect(() => {
     const projectTitle = project?.title || 'Untitled Project';
-    document.title = `${projectTitle} - Storyboard Tool`;
+    document.title = projectTitle;
   }, [project?.title]);
 
   // Clear selection when switching to Animatics view (Inspector should be hidden by default)

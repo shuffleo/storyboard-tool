@@ -382,6 +382,8 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   const handleContainerClick = (e: React.MouseEvent) => {
     // Deselect if clicking on empty area (not on a card)
     if ((e.target as HTMLElement).closest('[data-card]')) return;
+    // Don't deselect if clicking on scene header input or other interactive elements
+    if ((e.target as HTMLElement).closest('input') || (e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('select')) return;
     setSelectedShots(new Set());
     setFocusedIndex(null);
   };
@@ -832,6 +834,9 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                                 if (scene) {
                                   setEditingScene({ sceneId: scene.id, value: e.target.value });
                                 }
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
                               }}
                               onFocus={() => {
                                 if (scene) {
