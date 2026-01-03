@@ -534,38 +534,21 @@ export function TableView({ onSelect }: TableViewProps) {
                             <tr 
                               className={`bg-slate-800 ${dragSceneId === sceneId ? 'opacity-50' : ''}`}
                               data-scene-id={sceneId}
-                              draggable
+                              draggable={false}
                               onDragStart={(e) => {
-                                if (!isUnassigned) {
-                                  setDragSceneId(sceneId);
-                                  e.dataTransfer.effectAllowed = 'move';
-                                } else {
-                                  e.preventDefault();
-                                }
+                                // Temporarily disabled
+                                e.preventDefault();
                               }}
                               onDragOver={(e) => {
-                                if (!isUnassigned && dragSceneId && dragSceneId !== sceneId) {
-                                  e.preventDefault();
-                                  e.dataTransfer.dropEffect = 'move';
-                                }
+                                // Temporarily disabled
+                                e.preventDefault();
                               }}
                               onDrop={(e) => {
+                                // Temporarily disabled
                                 e.preventDefault();
-                                if (!isUnassigned && dragSceneId && dragSceneId !== sceneId) {
-                                  const currentOrder = sortedScenes.map(s => s.id);
-                                  const dragIndex = currentOrder.indexOf(dragSceneId);
-                                  const targetIndex = currentOrder.indexOf(sceneId);
-                                  
-                                  if (dragIndex !== -1 && targetIndex !== -1) {
-                                    const newOrder = [...currentOrder];
-                                    newOrder.splice(dragIndex, 1);
-                                    newOrder.splice(targetIndex, 0, dragSceneId);
-                                    reorderScenes(newOrder);
-                                  }
-                                }
-                                setDragSceneId(null);
                               }}
                               onDragEnd={() => {
+                                // Temporarily disabled
                                 setDragSceneId(null);
                               }}
                             >
