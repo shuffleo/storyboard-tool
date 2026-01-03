@@ -18,6 +18,7 @@ interface Store extends ProjectState {
   createScene: (sequenceId?: string) => string;
   updateScene: (id: string, updates: Partial<Scene>) => void;
   deleteScene: (id: string) => void;
+  reorderScenes: (sceneIds: string[]) => void;
   
   // Shots
   createShot: (sceneId?: string) => string;
@@ -326,6 +327,21 @@ export const useStore = create<Store>((set, get) => ({
       scenes: state.scenes.filter(s => s.id !== id),
       shots: state.shots.map(s => s.sceneId === id ? { ...s, sceneId: undefined } : s),
     }));
+    get().save();
+  },
+
+  reorderScenes: (sceneIds: string[]) => {
+    get().pushHistory();
+    set((state) => {
+      const sceneMap = new Map(state.scenes.map(s => [s.id, s]));
+      const reordered = sceneIds.map((id, index) => {
+        const scene = sceneMap.get(id);
+        if (!scene) return null;
+        return { ...scene, orderIndex: index, sceneNumber: String(index + 1) };
+      }).filter((s): s is Scene => s !== null);
+      
+      return { scenes: reordered };
+    });
     get().save();
   },
 

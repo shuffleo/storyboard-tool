@@ -29,6 +29,7 @@ export function TableView({ onSelect }: TableViewProps) {
   const [hoverPreview, setHoverPreview] = useState<{ image: string; x: number; y: number } | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ shotId: string; sceneName: string; isLastShot: boolean } | null>(null);
   const [expandedScenes, setExpandedScenes] = useState<Set<string>>(new Set());
+  const [dragSceneId, setDragSceneId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const generalNotesTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -433,10 +434,10 @@ export function TableView({ onSelect }: TableViewProps) {
             <tr>
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-8"></th>}
-              <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20 uppercase">Shot</th>
-              <th className={`p-2 border-b border-slate-700 text-center text-xs font-semibold text-slate-400 ${compactMode ? 'w-20' : 'w-24'} uppercase`}>Thumbnail</th>
-              <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">Script</th>
-              <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase">General Notes</th>
+              <th className={`p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase ${compactMode ? '' : 'w-20'}`} style={compactMode ? { width: '10%' } : {}}>Shot</th>
+              <th className={`p-2 border-b border-slate-700 text-center text-xs font-semibold text-slate-400 uppercase ${compactMode ? '' : 'w-24'}`} style={compactMode ? { width: '10%' } : {}}>Thumbnail</th>
+              <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase" style={compactMode ? { width: '40%' } : {}}>Script</th>
+              <th className="p-2 pl-[10px] border-b border-slate-700 text-left text-xs font-semibold text-slate-400 uppercase" style={compactMode ? { width: '40%' } : {}}>General Notes</th>
               {!compactMode && <th className="p-2 border-b border-slate-700 text-left text-xs font-semibold text-slate-400 w-20"></th>}
             </tr>
           </thead>
@@ -475,7 +476,44 @@ export function TableView({ onSelect }: TableViewProps) {
                         };
                         return (
                           <React.Fragment key={sceneId}>
-                            <tr className="bg-slate-800" data-scene-id={sceneId}>
+                            <tr 
+                              className={`bg-slate-800 ${dragSceneId === sceneId ? 'opacity-50' : ''}`}
+                              data-scene-id={sceneId}
+                              draggable
+                              onDragStart={(e) => {
+                                if (!isUnassigned) {
+                                  setDragSceneId(sceneId);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                } else {
+                                  e.preventDefault();
+                                }
+                              }}
+                              onDragOver={(e) => {
+                                if (!isUnassigned && dragSceneId && dragSceneId !== sceneId) {
+                                  e.preventDefault();
+                                  e.dataTransfer.dropEffect = 'move';
+                                }
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (!isUnassigned && dragSceneId && dragSceneId !== sceneId) {
+                                  const currentOrder = sortedScenes.map(s => s.id);
+                                  const dragIndex = currentOrder.indexOf(dragSceneId);
+                                  const targetIndex = currentOrder.indexOf(sceneId);
+                                  
+                                  if (dragIndex !== -1 && targetIndex !== -1) {
+                                    const newOrder = [...currentOrder];
+                                    newOrder.splice(dragIndex, 1);
+                                    newOrder.splice(targetIndex, 0, dragSceneId);
+                                    reorderScenes(newOrder);
+                                  }
+                                }
+                                setDragSceneId(null);
+                              }}
+                              onDragEnd={() => {
+                                setDragSceneId(null);
+                              }}
+                            >
                               <td colSpan={compactMode ? 4 : 7} className="p-3">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2 flex-1">
@@ -505,41 +543,46 @@ export function TableView({ onSelect }: TableViewProps) {
                                     {isUnassigned ? (
                                       <span className="font-semibold text-sm text-slate-200">Unassigned</span>
                                     ) : (
-                                      <input
-                                    type="text"
-                                    value={editingScene?.sceneId === sceneId ? editingScene.value : (scene?.title || '')}
-                                    onChange={(e) => {
-                                      if (scene) {
-                                        setEditingScene({ sceneId: scene.id, value: e.target.value });
-                                      }
-                                    }}
-                                    onFocus={() => {
-                                      if (scene) {
-                                        setEditingScene({ sceneId: scene.id, value: scene.title || '' });
-                                      }
-                                    }}
-                                    onBlur={() => {
-                                      if (scene && editingScene?.sceneId === scene.id) {
-                                        const finalValue = editingScene.value.trim() || `Scene ${scene.sceneNumber}`;
-                                        updateScene(scene.id, { title: finalValue });
-                                        setEditingScene(null);
-                                      }
-                                    }}
-                                    onKeyDown={(e) => {
-                                      // Allow standard keyboard shortcuts
-                                      if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
-                                        return; // Let browser handle these
-                                      }
-                                      if (e.key === 'Enter') {
-                                        e.currentTarget.blur();
-                                      } else if (e.key === 'Escape') {
-                                        setEditingScene(null);
-                                        e.currentTarget.blur();
-                                      }
-                                    }}
-                                    className="font-semibold text-sm text-slate-200 bg-transparent border-b border-slate-500 focus:outline-none focus:border-slate-400 flex-1"
-                                    placeholder={`Scene ${scene?.sceneNumber}`}
-                                  />
+                                      <div className="flex items-center gap-1 flex-1">
+                                        <span className="font-semibold text-sm text-slate-200 flex-shrink-0">
+                                          {scene?.sceneNumber || ''}:
+                                        </span>
+                                        <input
+                                          type="text"
+                                          value={editingScene?.sceneId === sceneId ? editingScene.value : (scene?.title || '')}
+                                          onChange={(e) => {
+                                            if (scene) {
+                                              setEditingScene({ sceneId: scene.id, value: e.target.value });
+                                            }
+                                          }}
+                                          onFocus={() => {
+                                            if (scene) {
+                                              setEditingScene({ sceneId: scene.id, value: scene.title || '' });
+                                            }
+                                          }}
+                                          onBlur={() => {
+                                            if (scene && editingScene?.sceneId === scene.id) {
+                                              const finalValue = editingScene.value.trim() || `Scene ${scene.sceneNumber}`;
+                                              updateScene(scene.id, { title: finalValue });
+                                              setEditingScene(null);
+                                            }
+                                          }}
+                                          onKeyDown={(e) => {
+                                            // Allow standard keyboard shortcuts
+                                            if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                                              return; // Let browser handle these
+                                            }
+                                            if (e.key === 'Enter') {
+                                              e.currentTarget.blur();
+                                            } else if (e.key === 'Escape') {
+                                              setEditingScene(null);
+                                              e.currentTarget.blur();
+                                            }
+                                          }}
+                                          className="font-semibold text-sm text-slate-200 bg-transparent border-b border-slate-500 focus:outline-none focus:border-slate-400 flex-1"
+                                          placeholder={`Scene ${scene?.sceneNumber}`}
+                                        />
+                                      </div>
                                     )}
                                     <span className="text-xs text-slate-400">
                                       ({sceneShots.length} shots)
@@ -1073,14 +1116,14 @@ const ShotRow = React.memo(function ShotRow({
       )}
       {!compactMode && (
         <td className="p-2 border-b border-slate-700">
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-0.5 items-center">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onMoveUp();
               }}
               disabled={!canMoveUp}
-              className="p-0.5 text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-0.5 text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
               title="Move up"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1093,7 +1136,7 @@ const ShotRow = React.memo(function ShotRow({
                 onMoveDown();
               }}
               disabled={!canMoveDown}
-              className="p-0.5 text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-0.5 text-slate-400 hover:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
               title="Move down"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1103,10 +1146,10 @@ const ShotRow = React.memo(function ShotRow({
           </div>
         </td>
       )}
-      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} w-20`}>
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} ${compactMode ? '' : 'w-20'}`} style={compactMode ? { width: '10%' } : {}}>
         {renderCell('shotCode', shot.shotCode)}
       </td>
-      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} text-center ${compactMode ? 'w-20' : 'w-24'}`}>
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'} text-center ${compactMode ? '' : 'w-24'}`} style={compactMode ? { width: '10%' } : {}}>
         {frames.length > 0 ? (
           <div className="flex justify-center">
             <ImageThumbnail
@@ -1133,7 +1176,7 @@ const ShotRow = React.memo(function ShotRow({
           </div>
         )}
       </td>
-      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'}`} style={{ width: '30%', minWidth: '200px' }}>
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'}`} style={compactMode ? { width: '40%' } : { width: '30%', minWidth: '200px' }}>
         <div style={{ width: '100%' }}>
           {renderCell('scriptText', shot.scriptText, () => (
             <div
@@ -1145,7 +1188,7 @@ const ShotRow = React.memo(function ShotRow({
           ))}
         </div>
       </td>
-      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'}`} style={{ width: '30%', minWidth: '200px' }}>
+      <td className={`border-b border-slate-700 ${compactMode ? 'p-1' : 'p-2'}`} style={compactMode ? { width: '40%' } : { width: '30%', minWidth: '200px' }}>
         <div style={{ width: '100%' }}>
           {renderCell('generalNotes', shot.generalNotes, () => (
             <div

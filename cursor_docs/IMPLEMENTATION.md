@@ -307,6 +307,58 @@ onKeyDown={(e) => {
 
 ## Common Refactoring Mistakes to Avoid
 
+### ⚠️ CRITICAL: Undefined Variable Errors (State Declaration)
+
+**ALWAYS declare state variables before using them in JSX or event handlers.**
+
+#### The Mistake: ReferenceError - Variable is not defined
+When adding new features that require state, ensure the state variable is declared with `useState` before it's referenced anywhere in the component.
+
+**WRONG** (causes "ReferenceError: dragSceneId is not defined"):
+```tsx
+// ❌ BAD: Using dragSceneId in JSX but never declared
+export function TableView() {
+  const [expandedScenes, setExpandedScenes] = useState<Set<string>>(new Set());
+  // Missing: const [dragSceneId, setDragSceneId] = useState<string | null>(null);
+  
+  return (
+    <tr 
+      className={`bg-slate-800 ${dragSceneId === sceneId ? 'opacity-50' : ''}`}
+      // ERROR: dragSceneId is not defined!
+      onDragStart={(e) => {
+        setDragSceneId(sceneId);  // ERROR: setDragSceneId is not defined!
+      }}
+    >
+```
+
+**CORRECT**:
+```tsx
+// ✅ GOOD: State declared before use
+export function TableView() {
+  const [expandedScenes, setExpandedScenes] = useState<Set<string>>(new Set());
+  const [dragSceneId, setDragSceneId] = useState<string | null>(null);  // Declared!
+  
+  return (
+    <tr 
+      className={`bg-slate-800 ${dragSceneId === sceneId ? 'opacity-50' : ''}`}
+      onDragStart={(e) => {
+        setDragSceneId(sceneId);  // Works!
+      }}
+    >
+```
+
+#### Rules to Follow:
+1. **Declare all state variables at the top** of the component, before any logic or JSX
+2. **Check for state usage** - if you use a variable in JSX/event handlers, ensure it's declared
+3. **Use TypeScript** - it will catch many of these errors, but not all (especially in JSX)
+4. **Test immediately** - run the app after adding new state to catch these errors early
+
+#### Common Patterns That Cause This:
+- Adding drag-and-drop handlers but forgetting to declare drag state
+- Adding toggle handlers but forgetting to declare toggle state
+- Copy-pasting code that uses state without copying the state declaration
+- Refactoring and removing state declaration but leaving state usage
+
 ### ⚠️ CRITICAL: React Hooks and Temporal Dead Zone Errors
 
 **NEVER reference variables in hooks before they are declared/initialized.**

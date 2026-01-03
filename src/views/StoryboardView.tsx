@@ -12,6 +12,8 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   const scenes = useStore((state) => state.scenes);
   const project = useStore((state) => state.project);
   const reorderShots = useStore((state) => state.reorderShots);
+  const reorderScenes = useStore((state) => state.reorderScenes);
+  const updateScene = useStore((state) => state.updateScene);
   const addFrame = useStore((state) => state.addFrame);
   const deleteShot = useStore((state) => state.deleteShot);
   const bulkUpdateShots = useStore((state) => state.bulkUpdateShots);
@@ -59,6 +61,8 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState<Map<string, number>>(new Map());
   const [dragShotId, setDragShotId] = useState<string | null>(null);
+  const [dragSceneId, setDragSceneId] = useState<string | null>(null);
+  const [editingScene, setEditingScene] = useState<{ sceneId: string; value: string } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -706,9 +710,47 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
               };
               
               return (
-                <div key={sceneId} data-scene-id={sceneId} className="mb-4">
+                <div 
+                  key={sceneId} 
+                  data-scene-id={sceneId} 
+                  className={`mb-4 ${dragSceneId === sceneId ? 'opacity-50' : ''}`}
+                  draggable={!isUnassigned}
+                  onDragStart={(e) => {
+                    if (!isUnassigned) {
+                      setDragSceneId(sceneId);
+                      e.dataTransfer.effectAllowed = 'move';
+                    } else {
+                      e.preventDefault();
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    if (!isUnassigned && dragSceneId && dragSceneId !== sceneId) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (!isUnassigned && dragSceneId && dragSceneId !== sceneId) {
+                      const currentOrder = sortedScenes.map(s => s.id);
+                      const dragIndex = currentOrder.indexOf(dragSceneId);
+                      const targetIndex = currentOrder.indexOf(sceneId);
+                      
+                      if (dragIndex !== -1 && targetIndex !== -1) {
+                        const newOrder = [...currentOrder];
+                        newOrder.splice(dragIndex, 1);
+                        newOrder.splice(targetIndex, 0, dragSceneId);
+                        reorderScenes(newOrder);
+                      }
+                    }
+                    setDragSceneId(null);
+                  }}
+                  onDragEnd={() => {
+                    setDragSceneId(null);
+                  }}
+                >
                   {/* Scene Header */}
-                  <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 mb-2">
+                  <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 mb-2 cursor-move">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-1">
                         {!isUnassigned && (
@@ -737,9 +779,46 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                         {isUnassigned ? (
                           <span className="font-semibold text-sm text-slate-200">Unassigned</span>
                         ) : (
-                          <span className="font-semibold text-sm text-slate-200">
-                            {scene ? `${scene.sceneNumber}: ${scene.title || `Scene ${scene.sceneNumber}`}` : `Scene ${sceneId}`}
-                          </span>
+                          <div className="flex items-center gap-1 flex-1">
+                            <span className="font-semibold text-sm text-slate-200 flex-shrink-0">
+                              {scene?.sceneNumber || sceneId}:
+                            </span>
+                            <input
+                              type="text"
+                              value={editingScene?.sceneId === sceneId ? editingScene.value : (scene?.title || '')}
+                              onChange={(e) => {
+                                if (scene) {
+                                  setEditingScene({ sceneId: scene.id, value: e.target.value });
+                                }
+                              }}
+                              onFocus={() => {
+                                if (scene) {
+                                  setEditingScene({ sceneId: scene.id, value: scene.title || '' });
+                                }
+                              }}
+                              onBlur={() => {
+                                if (scene && editingScene?.sceneId === scene.id) {
+                                  const finalValue = editingScene.value.trim() || `Scene ${scene.sceneNumber}`;
+                                  updateScene(scene.id, { title: finalValue });
+                                  setEditingScene(null);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                // Allow standard keyboard shortcuts
+                                if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
+                                  return; // Let browser handle these
+                                }
+                                if (e.key === 'Enter') {
+                                  e.currentTarget.blur();
+                                } else if (e.key === 'Escape') {
+                                  setEditingScene(null);
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              className="font-semibold text-sm text-slate-200 bg-transparent border-none outline-none focus:outline-none flex-1 px-0"
+                              placeholder={`Scene ${scene?.sceneNumber || sceneId}`}
+                            />
+                          </div>
                         )}
                         <span className="text-xs text-slate-400">
                           ({sceneShots.length} shots)
