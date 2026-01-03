@@ -331,30 +331,30 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
             <div className="flex gap-1 sm:gap-2">
               <button
                 onClick={() => onViewChange('table')}
-                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
+                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm border-0 outline-none focus:outline-none ${
                   currentView === 'table'
-                    ? 'bg-slate-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-700'
+                    ? 'bg-slate-600 text-white font-bold'
+                    : 'text-slate-300 hover:bg-slate-700 font-medium'
                 }`}
               >
                 Table
               </button>
               <button
                 onClick={() => onViewChange('storyboard')}
-                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
+                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm border-0 outline-none focus:outline-none ${
                   currentView === 'storyboard'
-                    ? 'bg-slate-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-700'
+                    ? 'bg-slate-600 text-white font-bold'
+                    : 'text-slate-300 hover:bg-slate-700 font-medium'
                 }`}
               >
                 Storyboard
               </button>
               <button
                 onClick={() => onViewChange('animatics')}
-                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-medium ${
+                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm border-0 outline-none focus:outline-none ${
                   currentView === 'animatics'
-                    ? 'bg-slate-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-700'
+                    ? 'bg-slate-600 text-white font-bold'
+                    : 'text-slate-300 hover:bg-slate-700 font-medium'
                 }`}
               >
                 Animatics
