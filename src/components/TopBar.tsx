@@ -369,7 +369,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
             <button
               onClick={undo}
               disabled={!canUndo}
-              className={`p-1.5 sm:p-2 rounded ${canUndo ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'}`}
+              className={`p-1.5 sm:p-2 rounded ${canUndo ? 'text-slate-300 hover:bg-slate-700' : 'text-white/25 cursor-not-allowed'}`}
               title="Undo (Cmd+Z)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -379,7 +379,7 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
             <button
               onClick={redo}
               disabled={!canRedo}
-              className={`p-1.5 sm:p-2 rounded ${canRedo ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 cursor-not-allowed'}`}
+              className={`p-1.5 sm:p-2 rounded ${canRedo ? 'text-slate-300 hover:bg-slate-700' : 'text-white/25 cursor-not-allowed'}`}
               title="Redo (Cmd+Shift+Z)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

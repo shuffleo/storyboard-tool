@@ -568,7 +568,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
         data-shot-id={shot.id}
         draggable
         onDragStart={(e) => handleCardDragStart(e, shot.id)}
-        className={`rounded-lg border-2 cursor-move flex flex-col ${
+        className={`group relative rounded-lg border-2 cursor-move flex flex-col ${
           isSelected
             ? 'bg-slate-700 border-slate-400 shadow-md'
             : 'bg-slate-800 border-slate-600'
@@ -579,6 +579,14 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
         } ${dragShotId === shot.id ? 'opacity-50' : ''}`}
         onClick={(e) => handleCardClick(e, shot.id, index)}
       >
+        {/* Hover overlay - 5% white */}
+        <div className="absolute inset-0 bg-white/5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-0" />
+        {/* Selected overlay - 10% white */}
+        {isSelected && (
+          <div className="absolute inset-0 bg-white/10 rounded-lg z-0" />
+        )}
+        {/* Content wrapper with relative z-index */}
+        <div className="relative z-10">
         <div className="flex items-center gap-2 mb-2">
           <span className="font-semibold text-sm text-slate-100">{shot.shotCode}</span>
           {sceneName && !groupByScene && (
@@ -683,6 +691,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
         {density === 'detailed' && shot.scriptText && (
           <div className="text-xs text-slate-400 mb-2 line-clamp-2">{shot.scriptText}</div>
         )}
+        </div>
       </div>
     );
   };
