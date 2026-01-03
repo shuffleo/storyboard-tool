@@ -30,6 +30,7 @@ export function TableView({ onSelect }: TableViewProps) {
   const [deleteDialog, setDeleteDialog] = useState<{ shotId: string; sceneName: string; isLastShot: boolean } | null>(null);
   const [expandedScenes, setExpandedScenes] = useState<Set<string>>(new Set());
   const [dragSceneId, setDragSceneId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const generalNotesTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -44,10 +45,40 @@ export function TableView({ onSelect }: TableViewProps) {
         scenes.forEach(scene => {
           newSet.add(scene.id);
         });
+        // Add 'unassigned' for shots without scene
+        newSet.add('unassigned');
         return newSet;
       });
     }
   }, [scenes]);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenu(null);
+    };
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu]);
+
+  // Expand all scenes
+  const expandAllScenes = () => {
+    const allSceneIds = new Set<string>();
+    scenes.forEach(scene => {
+      allSceneIds.add(scene.id);
+    });
+    allSceneIds.add('unassigned');
+    setExpandedScenes(allSceneIds);
+    setContextMenu(null);
+  };
+
+  // Collapse all scenes
+  const collapseAllScenes = () => {
+    setExpandedScenes(new Set());
+    setContextMenu(null);
+  };
 
   // Sort scenes by sceneNumber (low to high)
   // CRITICAL: Sort by sceneNumber (as number) not orderIndex
@@ -428,6 +459,30 @@ export function TableView({ onSelect }: TableViewProps) {
         </div>
       )}
 
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-slate-800 border border-slate-600 rounded shadow-lg py-1 min-w-[150px]"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={expandAllScenes}
+            className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+          >
+            Expand All
+          </button>
+          <button
+            onClick={collapseAllScenes}
+            className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+          >
+            Collapse All
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse">
           <thead className="bg-slate-800 sticky top-0 z-10">
@@ -520,6 +575,10 @@ export function TableView({ onSelect }: TableViewProps) {
                                     {!isUnassigned && (
                                       <button
                                         onClick={toggleExpanded}
+                                        onContextMenu={(e) => {
+                                          e.preventDefault();
+                                          setContextMenu({ x: e.clientX, y: e.clientY });
+                                        }}
                                         className="flex-shrink-0 text-slate-400 hover:text-slate-200 transition-transform border-0 outline-none focus:outline-none focus-visible:outline-none focus:border-0 active:border-0 ring-0 focus:ring-0 appearance-none bg-transparent p-0"
                                         style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
                                       >

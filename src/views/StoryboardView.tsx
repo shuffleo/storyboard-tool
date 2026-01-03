@@ -41,6 +41,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
 
   // Expanded scenes for accordion
   const [expandedScenes, setExpandedScenes] = useState<Set<string>>(new Set());
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // Initialize all scenes as expanded by default, and expand newly added scenes
   useEffect(() => {
@@ -57,6 +58,34 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
       });
     }
   }, [scenes, groupByScene]);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenu(null);
+    };
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu]);
+
+  // Expand all scenes
+  const expandAllScenes = () => {
+    const allSceneIds = new Set<string>();
+    scenes.forEach(scene => {
+      allSceneIds.add(scene.id);
+    });
+    allSceneIds.add('unassigned');
+    setExpandedScenes(allSceneIds);
+    setContextMenu(null);
+  };
+
+  // Collapse all scenes
+  const collapseAllScenes = () => {
+    setExpandedScenes(new Set());
+    setContextMenu(null);
+  };
   const [selectedShots, setSelectedShots] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState<Map<string, number>>(new Map());
@@ -756,6 +785,10 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
                         {!isUnassigned && (
                           <button
                             onClick={toggleExpanded}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setContextMenu({ x: e.clientX, y: e.clientY });
+                            }}
                             className="flex-shrink-0 text-slate-400 hover:text-slate-200 transition-transform border-none outline-none focus:outline-none"
                             style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
                           >
@@ -851,6 +884,30 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
           </div>
         )}
       </div>
+
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-slate-800 border border-slate-600 rounded shadow-lg py-1 min-w-[150px]"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={expandAllScenes}
+            className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+          >
+            Expand All
+          </button>
+          <button
+            onClick={collapseAllScenes}
+            className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+          >
+            Collapse All
+          </button>
+        </div>
+      )}
 
       {/* Bottom Bar */}
       <div 
