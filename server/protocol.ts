@@ -6,6 +6,8 @@ export type WsMessageType =
   | 'mutation:apply'
   | 'mutation:ack'
   | 'mutation:error'
+  | 'agent:editing'
+  | 'agent:done'
   | 'ping'
   | 'pong';
 

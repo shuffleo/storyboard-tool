@@ -98,12 +98,14 @@ Script text for the next shot.
 ### {duration}{unit}: {title}
 ```
 
-| Duration | Milliseconds | Notes |
-|----------|-------------|-------|
-| `2s` | 2000 | Seconds |
-| `500ms` | 500 | Milliseconds |
-| `1.5m` | 90000 | Minutes |
-| `0.3s` | 300 | Minimum duration |
+
+| Duration | Milliseconds | Notes            |
+| -------- | ------------ | ---------------- |
+| `2s`     | 2000         | Seconds          |
+| `500ms`  | 500          | Milliseconds     |
+| `1.5m`   | 90000        | Minutes          |
+| `0.3s`   | 300          | Minimum duration |
+
 
 ### Shot Metadata Comment
 
@@ -127,12 +129,14 @@ Multiple frames per shot allowed. Order = appearance order in file.
 
 ## Data Model
 
-| Markdown | Runtime Type | Key Fields |
-|----------|-------------|------------|
-| `project.md` frontmatter | `Project` | id, title, fps, aspectRatio, targetDuration |
-| `scene-NNN.md` | `Scene` | id, sceneNumber, title, summary, notes |
-| `### duration: title` block | `Shot` | id, title, scriptText, duration, tags, generalNotes |
-| `![](path)` | `StoryboardFrame` | id, shotId, image (path), caption |
+
+| Markdown                    | Runtime Type      | Key Fields                                          |
+| --------------------------- | ----------------- | --------------------------------------------------- |
+| `project.md` frontmatter    | `Project`         | id, title, fps, aspectRatio, targetDuration         |
+| `scene-NNN.md`              | `Scene`           | id, sceneNumber, title, summary, notes              |
+| `### duration: title` block | `Shot`            | id, title, scriptText, duration, tags, generalNotes |
+| `![](path)`                 | `StoryboardFrame` | id, shotId, image (path), caption                   |
+
 
 Shot codes (010, 020, 030) are computed from position, never stored in markdown.
 `Sequence` and `Version` types are not used in markdown format.
@@ -140,6 +144,7 @@ Shot codes (010, 020, 030) are computed from position, never stored in markdown.
 ## When to Edit Files Directly vs Use MCP Tools
 
 **Edit files directly** for:
+
 - Bulk text changes across multiple shots
 - Find-and-replace operations
 - Adding/removing entire scenes
@@ -147,6 +152,7 @@ Shot codes (010, 020, 030) are computed from position, never stored in markdown.
 - Any task where editing text is natural
 
 **Use MCP tools** for:
+
 - Atomic batch operations with validation
 - Reading computed state (timeline with start/end times)
 - Managing binary assets (images, audio, video)
@@ -276,3 +282,4 @@ Control companion server sync state.
 1. `storyboard_timeline("get_timeline")` to see current timing
 2. `storyboard_timeline("set_durations", { ... })` to update
 3. Preview in PWA animatics view
+

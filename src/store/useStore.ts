@@ -67,6 +67,7 @@ interface Store extends ProjectState {
   // Sync
   syncClient: SyncClient | null;
   syncStatus: SyncStatus;
+  agentEditing: boolean;
   initSync: (config?: Partial<SyncConfig>) => void;
   teardownSync: () => void;
   handleExternalDiff: (ops: DiffOp[]) => void;
@@ -106,6 +107,7 @@ export const useStore = create<Store>((set, get) => ({
   projectSource: 'none',
   syncClient: null,
   syncStatus: 'disconnected' as SyncStatus,
+  agentEditing: false,
 
   init: async () => {
     try {
@@ -687,6 +689,10 @@ export const useStore = create<Store>((set, get) => ({
 
     client.onDiff((ops) => {
       get().handleExternalDiff(ops);
+    });
+
+    client.onAgentEditing((editing) => {
+      set({ agentEditing: editing });
     });
 
     set({ syncClient: client });

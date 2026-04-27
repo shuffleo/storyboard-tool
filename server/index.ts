@@ -47,6 +47,14 @@ async function main() {
       console.log(`File change detected: ${ops.length} ops`);
       wsServer.broadcastDiff(ops);
     },
+    onEditingStart: () => {
+      console.log('Agent editing started');
+      wsServer.broadcastAgentEditing();
+    },
+    onEditingDone: () => {
+      console.log('Agent editing done');
+      wsServer.broadcastAgentDone();
+    },
   });
   console.log(`File watcher active`);
 

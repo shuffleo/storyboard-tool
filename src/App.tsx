@@ -23,6 +23,7 @@ function App() {
   const project = useStore((state) => state.project);
   const projectSource = useStore((state) => state.projectSource);
   const syncStatus = useStore((state) => state.syncStatus);
+  const agentEditing = useStore((state) => state.agentEditing);
   const initSync = useStore((state) => state.initSync);
   const teardownSync = useStore((state) => state.teardownSync);
   const openProjectFromHandle = useStore((state) => state.openProjectFromHandle);
@@ -180,7 +181,7 @@ function App() {
   }
 
   return (
-    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0f172a' }}>
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0f172a', position: 'relative' }}>
       <TopBar
         currentView={currentView}
         onViewChange={setCurrentView}
@@ -211,6 +212,43 @@ function App() {
           />
         )}
       </div>
+      {agentEditing && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.55)',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(2px)',
+          pointerEvents: 'all',
+        }}>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '16px',
+          }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '3px solid rgba(148, 163, 184, 0.3)',
+              borderTopColor: '#818cf8',
+              borderRadius: '50%',
+              animation: 'agent-spin 0.8s linear infinite',
+            }} />
+            <div style={{ color: '#e2e8f0', fontSize: '16px', fontWeight: 500 }}>
+              Agent is editing...
+            </div>
+            <div style={{ color: '#94a3b8', fontSize: '13px' }}>
+              Changes will appear when the agent finishes
+            </div>
+          </div>
+          <style>{`@keyframes agent-spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
       <DebugPanel enabled={debugMode} />
     </div>
   );

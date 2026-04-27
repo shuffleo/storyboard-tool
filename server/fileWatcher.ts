@@ -9,13 +9,16 @@ export interface FileWatcherOptions {
   debounceMs: number;
   stateManager: StateManager;
   onDiff: (ops: DiffOp[]) => void;
+  onEditingStart?: () => void;
+  onEditingDone?: () => void;
 }
 
 export function startFileWatcher(options: FileWatcherOptions) {
-  const { projectPath, debounceMs, stateManager, onDiff } = options;
+  const { projectPath, debounceMs, stateManager, onDiff, onEditingStart, onEditingDone } = options;
   const absPath = resolve(projectPath);
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let isEditing = false;
   const pendingChanges = new Map<string, 'change' | 'add' | 'unlink'>();
 
   function flush() {
@@ -57,8 +60,16 @@ export function startFileWatcher(options: FileWatcherOptions) {
   }
 
   function scheduleFlush() {
+    if (!isEditing) {
+      isEditing = true;
+      onEditingStart?.();
+    }
     if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(flush, debounceMs);
+    debounceTimer = setTimeout(() => {
+      flush();
+      isEditing = false;
+      onEditingDone?.();
+    }, debounceMs);
   }
 
   const watcher = watch(

@@ -35,6 +35,7 @@ export class SyncClient {
   private diffCallbacks: Array<(ops: DiffOp[]) => void> = [];
   private statusCallbacks: Array<(status: SyncStatus) => void> = [];
   private fullSyncCallbacks: Array<(state: ProjectState, version: number) => void> = [];
+  private agentEditingCallbacks: Array<(editing: boolean) => void> = [];
 
   constructor(config?: Partial<SyncConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -145,6 +146,13 @@ export class SyncClient {
     };
   }
 
+  onAgentEditing(callback: (editing: boolean) => void): () => void {
+    this.agentEditingCallbacks.push(callback);
+    return () => {
+      this.agentEditingCallbacks = this.agentEditingCallbacks.filter(c => c !== callback);
+    };
+  }
+
   private handleMessage(msg: WsMessage): void {
     switch (msg.type) {
       case 'sync:full': {
@@ -171,6 +179,12 @@ export class SyncClient {
         console.error('Mutation error:', payload.message);
         break;
       }
+      case 'agent:editing':
+        for (const cb of this.agentEditingCallbacks) cb(true);
+        break;
+      case 'agent:done':
+        for (const cb of this.agentEditingCallbacks) cb(false);
+        break;
       case 'ping':
         this.send({ type: 'pong', id: nanoid(), payload: {} });
         break;

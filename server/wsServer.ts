@@ -117,8 +117,18 @@ export function startWsServer(options: WsServerOptions) {
     broadcast({ type: 'sync:diff', id: nanoid(), payload });
   }
 
+  function broadcastAll(msg: WsMessage) {
+    broadcast(msg);
+  }
+
   return {
     broadcastDiff,
+    broadcastAgentEditing: () => {
+      broadcastAll({ type: 'agent:editing', id: nanoid(), payload: {} });
+    },
+    broadcastAgentDone: () => {
+      broadcastAll({ type: 'agent:done', id: nanoid(), payload: {} });
+    },
     close: () => {
       clearInterval(pingInterval);
       for (const ws of clients) {
