@@ -40,6 +40,13 @@ function App() {
     let mounted = true;
 
     const startup = async () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('storage') === 'internal') {
+        await init();
+        if (mounted) setAppPhase('project');
+        return;
+      }
+
       const capabilities = detectFSACapabilities();
 
       if (capabilities.supported) {

@@ -30,6 +30,7 @@ async function main() {
   const wsServer = startWsServer({
     port: config.wsPort,
     stateManager,
+    projectPath,
     onMutationApplied: () => {},
   });
   console.log(`WebSocket server: ws://127.0.0.1:${config.wsPort}`);

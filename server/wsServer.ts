@@ -6,11 +6,12 @@ import type { WsMessage, DiffOp, SyncFullPayload, SyncDiffPayload, MutationApply
 export interface WsServerOptions {
   port: number;
   stateManager: StateManager;
+  projectPath?: string;
   onMutationApplied: (ops: DiffOp[]) => void;
 }
 
 export function startWsServer(options: WsServerOptions) {
-  const { port, stateManager, onMutationApplied } = options;
+  const { port, stateManager, projectPath, onMutationApplied } = options;
   const clients = new Set<WebSocket>();
 
   const wss = new WebSocketServer({ port, host: '127.0.0.1' });
@@ -22,6 +23,7 @@ export function startWsServer(options: WsServerOptions) {
     const fullPayload: SyncFullPayload = {
       state: stateManager.getState(),
       version: stateManager.getVersion(),
+      projectPath,
     };
     sendMessage(ws, { type: 'sync:full', id: nanoid(), payload: fullPayload });
 

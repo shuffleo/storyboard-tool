@@ -68,6 +68,7 @@ interface Store extends ProjectState {
   syncClient: SyncClient | null;
   syncStatus: SyncStatus;
   agentEditing: boolean;
+  projectFolderPath: string | null;
   initSync: (config?: Partial<SyncConfig>) => void;
   teardownSync: () => void;
   handleExternalDiff: (ops: DiffOp[]) => void;
@@ -108,6 +109,7 @@ export const useStore = create<Store>((set, get) => ({
   syncClient: null,
   syncStatus: 'disconnected' as SyncStatus,
   agentEditing: false,
+  projectFolderPath: null,
 
   init: async () => {
     try {
@@ -609,6 +611,7 @@ export const useStore = create<Store>((set, get) => ({
         ...state,
         projectHandle: handle,
         projectSource: 'fsa',
+        projectFolderPath: handle.directoryHandle.name,
         history: [state],
         historyIndex: 0,
         canUndo: false,
@@ -648,6 +651,7 @@ export const useStore = create<Store>((set, get) => ({
       versions: [],
       projectHandle: null,
       projectSource: 'none',
+      projectFolderPath: null,
       syncClient: null,
       syncStatus: 'disconnected' as SyncStatus,
       history: [],
@@ -684,6 +688,7 @@ export const useStore = create<Store>((set, get) => ({
         historyIndex: 0,
         canUndo: false,
         canRedo: false,
+        projectFolderPath: client.projectPath,
       });
     });
 
@@ -817,4 +822,8 @@ export const useStore = create<Store>((set, get) => ({
     get().save();
   },
 }));
+
+if (typeof window !== 'undefined') {
+  (window as any).__storyboardStore = useStore;
+}
 

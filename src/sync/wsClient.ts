@@ -32,6 +32,8 @@ export class SyncClient {
   private mutationBatchTimer: ReturnType<typeof setTimeout> | null = null;
   private batchedOps: DiffOp[] = [];
 
+  private _projectPath: string | null = null;
+
   private diffCallbacks: Array<(ops: DiffOp[]) => void> = [];
   private statusCallbacks: Array<(status: SyncStatus) => void> = [];
   private fullSyncCallbacks: Array<(state: ProjectState, version: number) => void> = [];
@@ -47,6 +49,7 @@ export class SyncClient {
   get companionUrl(): string { return `ws://localhost:${this.config.wsPort}`; }
   get assetBaseUrl(): string { return `http://localhost:${this.config.assetPort}`; }
   get isConnected(): boolean { return this._status === 'connected'; }
+  get projectPath(): string | null { return this._projectPath; }
 
   connect(): void {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
@@ -158,6 +161,7 @@ export class SyncClient {
       case 'sync:full': {
         const payload = msg.payload as SyncFullPayload;
         this._version = payload.version;
+        if (payload.projectPath) this._projectPath = payload.projectPath;
         for (const cb of this.fullSyncCallbacks) cb(payload.state, payload.version);
         break;
       }

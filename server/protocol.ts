@@ -20,6 +20,7 @@ export interface WsMessage {
 export interface SyncFullPayload {
   state: ProjectState;
   version: number;
+  projectPath?: string;
 }
 
 export interface SyncDiffPayload {

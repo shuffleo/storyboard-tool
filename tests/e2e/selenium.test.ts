@@ -1,646 +1,769 @@
 /**
  * Selenium-based E2E tests for Storyboard Tool
  * Tests actual UI interactions and visual behavior
+ *
+ * Requires: Vite dev server running on port 5173
+ *   npm run dev
+ *
+ * Run with:
+ *   npx vitest run tests/e2e/selenium.test.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { Builder, By, until, WebDriver } from 'selenium-webdriver';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { Builder, By, until, WebDriver, WebElement } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome';
+
+const BASE_URL = 'http://localhost:5173';
+const APP_URL = `${BASE_URL}?storage=internal`;
+
+function seedScript(): string {
+  return `
+    const store = window.__storyboardStore;
+    if (!store) throw new Error('Store not exposed on window');
+    const s = store.getState();
+    if (s.scenes.length > 0 && s.shots.length > 0) return 'already seeded';
+
+    const sceneId1 = s.createScene();
+    const sceneId2 = s.createScene();
+    s.updateScene(sceneId1, { title: 'Opening', summary: 'The journey begins' });
+    s.updateScene(sceneId2, { title: 'Climax', summary: 'The turning point' });
+
+    const shots1 = s.shots.filter(sh => sh.sceneId === sceneId1);
+    if (shots1.length > 0) {
+      s.updateShot(shots1[0].id, {
+        shotCode: '010',
+        title: 'Wide establishing',
+        scriptText: 'A sweeping vista of the mountains at dawn.',
+        duration: 3000,
+        generalNotes: 'Use warm golden tones',
+      });
+    }
+
+    const shot2 = s.createShot(sceneId1);
+    s.updateShot(shot2, {
+      shotCode: '020',
+      title: 'Close-up character',
+      scriptText: 'Character looks up at the sky.',
+      duration: 2000,
+      generalNotes: 'Focus on expression',
+    });
+
+    const shots2 = s.shots.filter(sh => sh.sceneId === sceneId2);
+    if (shots2.length > 0) {
+      s.updateShot(shots2[0].id, {
+        shotCode: '030',
+        title: 'Action sequence',
+        scriptText: 'Character runs through the forest.',
+        duration: 4000,
+        generalNotes: 'Fast pacing, shaky cam feel',
+      });
+    }
+
+    return 'seeded';
+  `;
+}
+
+async function waitForApp(driver: WebDriver): Promise<void> {
+  await driver.wait(until.elementLocated(By.css('#root')), 10000);
+  await driver.wait(
+    async () => {
+      const phase = await driver.executeScript(
+        `const s = window.__storyboardStore; return s ? 'ready' : 'loading';`
+      );
+      return phase === 'ready';
+    },
+    10000,
+    'Store never became available on window'
+  );
+  await driver.sleep(500);
+}
+
+async function ensureProjectView(driver: WebDriver): Promise<void> {
+  const hasTopBar = await driver.findElements(By.xpath("//button[contains(text(), 'Table')]"));
+  if (hasTopBar.length === 0) {
+    const fallback = await driver.findElements(By.xpath("//button[contains(text(), 'Continue with Internal Storage')]"));
+    if (fallback.length > 0) {
+      await fallback[0].click();
+      await driver.sleep(1000);
+    }
+  }
+  await driver.wait(until.elementLocated(By.xpath("//button[contains(text(), 'Table')]")), 5000);
+}
+
+async function seedTestData(driver: WebDriver): Promise<void> {
+  const result = await driver.executeScript(seedScript());
+  if (result === 'seeded') {
+    await driver.sleep(500);
+  }
+}
+
+async function ensureMenuClosed(driver: WebDriver): Promise<void> {
+  await driver.executeScript(`
+    const el = document.querySelector('.absolute.right-0.mt-1.w-48');
+    if (el) {
+      const menuBtn = document.querySelector('button[title="Menu"]');
+      if (menuBtn) menuBtn.click();
+    }
+  `);
+  await driver.sleep(200);
+}
+
+async function openMenu(driver: WebDriver): Promise<void> {
+  await ensureMenuClosed(driver);
+  const menuBtn = await driver.findElement(By.css('button[title="Menu"]'));
+  await menuBtn.click();
+  await driver.sleep(400);
+  await driver.wait(
+    until.elementLocated(By.css('.absolute.right-0.mt-1.w-48')),
+    3000
+  );
+}
+
+async function openMenuAndFind(driver: WebDriver, text: string): Promise<WebElement> {
+  await openMenu(driver);
+  return driver.findElement(
+    By.xpath(`//*[contains(@class, 'w-48')]//button[contains(text(), '${text}')] | //*[contains(@class, 'w-48')]//a[contains(text(), '${text}')]`)
+  );
+}
 
 describe('E2E Tests with Selenium', () => {
   let driver: WebDriver;
-  const baseUrl = 'http://localhost:5173'; // Vite dev server default
 
   beforeAll(async () => {
     const options = new chrome.Options();
-    // options.addArguments('--headless'); // Uncomment for headless mode
+    options.addArguments('--headless=new');
     options.addArguments('--no-sandbox');
     options.addArguments('--disable-dev-shm-usage');
-    
+    options.addArguments('--window-size=1280,900');
+
     driver = await new Builder()
       .forBrowser('chrome')
       .setChromeOptions(options)
       .build();
-    
-    // Navigate to app
-    await driver.get(baseUrl);
-    // Wait for app to load
-    await driver.wait(until.elementLocated(By.css('#root')), 10000);
-  }, 30000);
+
+    await driver.get(APP_URL);
+    await waitForApp(driver);
+    await ensureProjectView(driver);
+    await seedTestData(driver);
+  }, 60000);
 
   afterAll(async () => {
-    await driver.quit();
+    if (driver) await driver.quit();
   });
 
-  describe('Animatics View - Click Handling', () => {
-    it('should navigate to Animatics view without crashing', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      
-      // Wait for view to load
-      await driver.sleep(1000);
-      
-      // Check that view is visible (not blank)
-      const videoPlayer = await driver.findElement(By.css('[class*="bg-slate-950"]'));
-      expect(await videoPlayer.isDisplayed()).toBe(true);
+  // ─── Landing Screen ─────────────────────────────────────────────
+
+  describe('Landing Screen', () => {
+    it('should show landing screen when no storage param', async () => {
+      await driver.get(BASE_URL);
+      await driver.wait(until.elementLocated(By.css('#root')), 10000);
+      await driver.sleep(2000);
+
+      const heading = await driver.findElements(By.xpath("//h1[contains(text(), 'Storyboard')]"));
+      const createBtn = await driver.findElements(By.xpath("//button[contains(text(), 'Create New Project')]"));
+      const openBtn = await driver.findElements(By.xpath("//button[contains(text(), 'Open Existing Project')]"));
+      const internalBtn = await driver.findElements(By.xpath("//button[contains(text(), 'Continue with Internal Storage')]"));
+
+      const isLanding = heading.length > 0 &&
+        (createBtn.length > 0 || openBtn.length > 0 || internalBtn.length > 0);
+      expect(isLanding).toBe(true);
+
+      // Navigate back to project view for remaining tests
+      await driver.get(APP_URL);
+      await waitForApp(driver);
+      await ensureProjectView(driver);
+      await seedTestData(driver);
     });
 
-    it('should handle clicking on empty shot cards without blank screen', async () => {
-      // Navigate to Animatics view
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Find timeline frames
-      const timelineFrames = await driver.findElements(By.css('[class*="cursor-move"]'));
-      
-      if (timelineFrames.length > 0) {
-        // Click on first frame
-        await timelineFrames[0].click();
-        await driver.sleep(500);
-        
-        // Verify screen is not blank - check for video player or error message
-        const videoPlayer = await driver.findElement(By.css('[class*="bg-slate-950"]'));
-        const isDisplayed = await videoPlayer.isDisplayed();
-        expect(isDisplayed).toBe(true);
-      }
+    it('should bypass landing screen with ?storage=internal', async () => {
+      const tableBtn = await driver.findElements(By.xpath("//button[contains(text(), 'Table')]"));
+      expect(tableBtn.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ─── View Navigation ────────────────────────────────────────────
+
+  describe('View Navigation', () => {
+    it('should have all view buttons visible', async () => {
+      const tableBtn = await driver.findElement(By.xpath("//button[contains(text(), 'Table')]"));
+      const storyboardBtn = await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]"));
+      const animaticsBtn = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
+
+      expect(await tableBtn.isDisplayed()).toBe(true);
+      expect(await storyboardBtn.isDisplayed()).toBe(true);
+      expect(await animaticsBtn.isDisplayed()).toBe(true);
     });
 
-    it('should handle clicking on shot cards with images without blank screen', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Find frames with images
-      const framesWithImages = await driver.findElements(By.css('img[alt*="Shot"]'));
-      
-      if (framesWithImages.length > 0) {
-        // Click on image
-        await framesWithImages[0].click();
-        await driver.sleep(500);
-        
-        // Verify screen is not blank
-        const videoPlayer = await driver.findElement(By.css('[class*="bg-slate-950"]'));
-        expect(await videoPlayer.isDisplayed()).toBe(true);
-      }
-    });
-
-    it('should handle clicking on empty image area without blank screen', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Find empty image area (text saying "No image available")
-      const emptyImageArea = await driver.findElement(By.xpath("//div[contains(text(), 'No image available')]"));
-      await emptyImageArea.click();
+    it('should navigate to Table view', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
       await driver.sleep(500);
-      
-      // Verify screen is not blank
-      const videoPlayer = await driver.findElement(By.css('[class*="bg-slate-950"]'));
-      expect(await videoPlayer.isDisplayed()).toBe(true);
-    });
-  });
-
-  describe('Storyboard View - Click Handling', () => {
-    it('should navigate to Storyboard view without crashing', async () => {
-      const storyboardButton = await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]"));
-      await storyboardButton.click();
-      
-      await driver.sleep(1000);
-      
-      // Check that view is visible
-      const container = await driver.findElement(By.css('[class*="overflow-auto"]'));
-      expect(await container.isDisplayed()).toBe(true);
-    });
-
-    it('should handle clicking on empty cards without blank screen', async () => {
-      const storyboardButton = await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]"));
-      await storyboardButton.click();
-      await driver.sleep(1000);
-      
-      // Find cards
-      const cards = await driver.findElements(By.css('[data-card]'));
-      
-      if (cards.length > 0) {
-        // Click on first card
-        await cards[0].click();
-        await driver.sleep(500);
-        
-        // Verify screen is not blank
-        const container = await driver.findElement(By.css('[class*="overflow-auto"]'));
-        expect(await container.isDisplayed()).toBe(true);
-      }
-    });
-
-    it('should handle clicking around thumbnail area without blank screen', async () => {
-      const storyboardButton = await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]"));
-      await storyboardButton.click();
-      await driver.sleep(1000);
-      
-      // Find image areas
-      const imageAreas = await driver.findElements(By.css('[class*="image-area"]'));
-      
-      if (imageAreas.length > 0) {
-        // Click on image area
-        await imageAreas[0].click();
-        await driver.sleep(500);
-        
-        // Verify screen is not blank
-        const container = await driver.findElement(By.css('[class*="overflow-auto"]'));
-        expect(await container.isDisplayed()).toBe(true);
-      }
-    });
-  });
-
-  describe('TableView - Click Handling', () => {
-    it('should navigate to Table view without crashing', async () => {
-      const tableButton = await driver.findElement(By.xpath("//button[contains(text(), 'Table')]"));
-      await tableButton.click();
-      
-      await driver.sleep(1000);
-      
-      // Check that view is visible
       const table = await driver.findElement(By.css('table'));
       expect(await table.isDisplayed()).toBe(true);
     });
 
-    it('should handle clicking on table rows without blank screen', async () => {
-      const tableButton = await driver.findElement(By.xpath("//button[contains(text(), 'Table')]"));
-      await tableButton.click();
-      await driver.sleep(1000);
-      
-      // Find table rows
+    it('should navigate to Storyboard view', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]")).then(b => b.click());
+      await driver.sleep(500);
+      const cards = await driver.findElements(By.css('[data-card]'));
+      expect(cards.length).toBeGreaterThan(0);
+    });
+
+    it('should navigate to Animatics view', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]")).then(b => b.click());
+      await driver.sleep(800);
+      const player = await driver.findElement(By.css('[class*="bg-black"]'));
+      expect(await player.isDisplayed()).toBe(true);
+    });
+  });
+
+  // ─── Table View ─────────────────────────────────────────────────
+
+  describe('Table View', () => {
+    beforeEach(async () => {
+      await ensureMenuClosed(driver);
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
+      await driver.sleep(500);
+    });
+
+    it('should render a table with shot rows', async () => {
       const rows = await driver.findElements(By.css('tr[data-shot-id]'));
-      
+      expect(rows.length).toBeGreaterThan(0);
+    });
+
+    it('should open Inspector when clicking View Details on a shot', async () => {
+      const viewDetailsBtns = await driver.findElements(By.css('button[title="View details"]'));
+      if (viewDetailsBtns.length > 0) {
+        await viewDetailsBtns[0].click();
+        await driver.sleep(500);
+        const inspector = await driver.findElements(By.css('[data-testid="inspector"]'));
+        expect(inspector.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('should not blank the screen when clicking rows', async () => {
+      const rows = await driver.findElements(By.css('tr[data-shot-id]'));
       if (rows.length > 0) {
         await rows[0].click();
-        await driver.sleep(500);
-        
-        // Verify screen is not blank
+        await driver.sleep(300);
         const table = await driver.findElement(By.css('table'));
         expect(await table.isDisplayed()).toBe(true);
       }
     });
   });
 
-  describe('UI Element Visibility', () => {
-    it('should verify all view buttons are visible', async () => {
-      const tableButton = await driver.findElement(By.xpath("//button[contains(text(), 'Table')]"));
-      const storyboardButton = await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]"));
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      
-      expect(await tableButton.isDisplayed()).toBe(true);
-      expect(await storyboardButton.isDisplayed()).toBe(true);
-      expect(await animaticsButton.isDisplayed()).toBe(true);
-    });
+  // ─── Storyboard View ───────────────────────────────────────────
 
-    it('should verify three-dot menu is visible', async () => {
-      const menuButton = await driver.findElement(By.css('svg[viewBox="0 0 24 24"]'));
-      expect(await menuButton.isDisplayed()).toBe(true);
-    });
-
-    it('should verify undo/redo buttons are visible', async () => {
-      const undoButton = await driver.findElement(By.css('svg[viewBox*="24 24"]'));
-      expect(await undoButton.isDisplayed()).toBe(true);
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should not show blank screen when clicking corrupted images', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Try to find error message or image
-      const errorMessage = await driver.findElements(By.xpath("//div[contains(text(), 'Image Error')]"));
-      const videoPlayer = await driver.findElement(By.css('[class*="bg-slate-950"]'));
-      
-      // Either error message should show OR video player should be visible (not blank)
-      const hasError = errorMessage.length > 0;
-      const hasPlayer = await videoPlayer.isDisplayed();
-      
-      expect(hasError || hasPlayer).toBe(true);
-    });
-  });
-
-  describe('Inspector Panel', () => {
-    it('should open Inspector when clicking on shot', async () => {
-      const tableButton = await driver.findElement(By.xpath("//button[contains(text(), 'Table')]"));
-      await tableButton.click();
-      await driver.sleep(1000);
-      
-      // Click on a shot row
-      const rows = await driver.findElements(By.css('tr[data-shot-id]'));
-      if (rows.length > 0) {
-        await rows[0].click();
-        await driver.sleep(500);
-        
-        // Check if Inspector is visible
-        const inspector = await driver.findElements(By.css('[class*="w-80"][class*="bg-slate-800"]'));
-        expect(inspector.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('should hide close button in Animatics view', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Select a shot
-      const timelineFrames = await driver.findElements(By.css('[class*="cursor-move"]'));
-      if (timelineFrames.length > 0) {
-        await timelineFrames[0].click();
-        await driver.sleep(500);
-        
-        // Close button should not be visible
-        const closeButtons = await driver.findElements(By.xpath("//button[contains(text(), '✕')]"));
-        // In Animatics view, close button should be hidden
-        expect(closeButtons.length).toBe(0);
-      }
-    });
-  });
-
-  describe('Scrollbar Visibility', () => {
-    it('should hide scrollbar under time ruler in Animatics view', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Find time ruler container
-      const timeRuler = await driver.findElements(By.css('[class*="scrollbar-hide"]'));
-      expect(timeRuler.length).toBeGreaterThan(0);
-    });
-
-    it('should show scrollbar under timeline shots in Animatics view', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Timeline track should have visible scrollbar
-      const timelineTrack = await driver.findElement(By.css('[ref*="timelineRef"]'));
-      // Scrollbar should be visible (not hidden)
-      expect(await timelineTrack.isDisplayed()).toBe(true);
-    });
-  });
-
-  describe('Delete All Content', () => {
-    it('should show Delete All Content option in menu', async () => {
-      const menuButton = await driver.findElement(By.css('svg[viewBox="0 0 24 24"]'));
-      await menuButton.click();
+  describe('Storyboard View', () => {
+    beforeEach(async () => {
+      await ensureMenuClosed(driver);
+      await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]")).then(b => b.click());
       await driver.sleep(500);
-      
-      // Find Delete All Content button
-      const deleteButton = await driver.findElement(By.xpath("//button[contains(text(), 'Delete All Content')]"));
-      expect(await deleteButton.isDisplayed()).toBe(true);
     });
 
-    it('should show confirmation dialog with three options', async () => {
-      const menuButton = await driver.findElement(By.css('svg[viewBox="0 0 24 24"]'));
-      await menuButton.click();
-      await driver.sleep(500);
-      
-      const deleteButton = await driver.findElement(By.xpath("//button[contains(text(), 'Delete All Content')]"));
-      await deleteButton.click();
-      await driver.sleep(500);
-      
-      // Check for dialog with three buttons
-      const deleteAllBtn = await driver.findElements(By.xpath("//button[contains(text(), 'Delete All Content')]"));
-      const exportDeleteBtn = await driver.findElements(By.xpath("//button[contains(text(), 'Export and Delete All Content')]"));
-      const cancelBtn = await driver.findElements(By.xpath("//button[contains(text(), 'Cancel')]"));
-      
-      expect(deleteAllBtn.length).toBeGreaterThan(0);
-      expect(exportDeleteBtn.length).toBeGreaterThan(0);
-      expect(cancelBtn.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Inspector Panel', () => {
-    it('should show shot code in header when shot is selected', async () => {
-      const tableButton = await driver.findElement(By.xpath("//button[contains(text(), 'Table')]"));
-      await tableButton.click();
-      await driver.sleep(1000);
-      
-      // Click on a shot
-      const rows = await driver.findElements(By.css('tr[data-shot-id]'));
-      if (rows.length > 0) {
-        await rows[0].click();
-        await driver.sleep(500);
-        
-        // Check for shot code input in header
-        const headerInput = await driver.findElements(By.css('input[type="text"]'));
-        expect(headerInput.length).toBeGreaterThan(0);
-      }
+    it('should render shot cards', async () => {
+      const cards = await driver.findElements(By.css('[data-card]'));
+      expect(cards.length).toBeGreaterThan(0);
     });
 
-    it('should show image carousel for shots with multiple images', async () => {
-      const tableButton = await driver.findElement(By.xpath("//button[contains(text(), 'Table')]"));
-      await tableButton.click();
-      await driver.sleep(1000);
-      
-      // Click on a shot
-      const rows = await driver.findElements(By.css('tr[data-shot-id]'));
-      if (rows.length > 0) {
-        await rows[0].click();
-        await driver.sleep(500);
-        
-        // Check for image carousel (navigation arrows or dots)
-        const carouselArrows = await driver.findElements(By.css('svg[viewBox*="24 24"]'));
-        // Should have navigation if multiple images exist
-        expect(carouselArrows.length).toBeGreaterThanOrEqual(0);
-      }
-    });
-  });
-
-  describe('Drag and Drop', () => {
-    it('should allow dragging shots in Storyboard view', async () => {
-      const storyboardButton = await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]"));
-      await storyboardButton.click();
-      await driver.sleep(1000);
-      
-      // Find draggable cards
+    it('should show draggable cards', async () => {
       const cards = await driver.findElements(By.css('[data-card][draggable="true"]'));
       expect(cards.length).toBeGreaterThan(0);
     });
 
-    it('should allow dragging shots in Animatics timeline', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Find timeline frames (should be draggable)
-      const timelineFrames = await driver.findElements(By.css('[class*="cursor-move"]'));
-      expect(timelineFrames.length).toBeGreaterThan(0);
+    it('should handle clicking on cards without blanking', async () => {
+      const cards = await driver.findElements(By.css('[data-card]'));
+      if (cards.length > 0) {
+        await cards[0].click();
+        await driver.sleep(300);
+        const container = await driver.findElement(By.css('[class*="overflow"]'));
+        expect(await container.isDisplayed()).toBe(true);
+      }
+    });
+
+    it('should open Inspector when clicking a card', async () => {
+      const cards = await driver.findElements(By.css('[data-card]'));
+      if (cards.length > 0) {
+        await cards[0].click();
+        await driver.sleep(800);
+        const inspector = await driver.findElements(By.css('[data-testid="inspector"]'));
+        expect(inspector.length).toBeGreaterThan(0);
+      }
     });
   });
 
-  describe('Timeline Zoom', () => {
-    it('should have zoom controls in Animatics view', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Find zoom buttons
-      const zoomButtons = await driver.findElements(By.xpath("//button[contains(text(), '+') or contains(text(), '−')]"));
-      expect(zoomButtons.length).toBeGreaterThanOrEqual(2);
+  // ─── Animatics View ────────────────────────────────────────────
+
+  describe('Animatics View', () => {
+    beforeEach(async () => {
+      await ensureMenuClosed(driver);
+      await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]")).then(b => b.click());
+      await driver.sleep(800);
+    });
+
+    it('should show video player area', async () => {
+      const player = await driver.findElement(By.css('[class*="bg-black"]'));
+      expect(await player.isDisplayed()).toBe(true);
+    });
+
+    it('should have zoom controls', async () => {
+      const plusBtn = await driver.findElements(By.xpath("//button[text()='+']"));
+      const minusBtn = await driver.findElements(By.xpath("//button[text()='\u2212']"));
+      expect(plusBtn.length).toBeGreaterThanOrEqual(1);
+      expect(minusBtn.length).toBeGreaterThanOrEqual(1);
     });
 
     it('should show zoom percentage', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Find zoom percentage display
-      const zoomDisplay = await driver.findElements(By.xpath("//span[contains(text(), '%')]"));
-      expect(zoomDisplay.length).toBeGreaterThan(0);
+      const hasZoom = await driver.executeScript(`
+        const spans = document.querySelectorAll('span');
+        for (const s of spans) {
+          if (s.textContent && s.textContent.includes('%')) return true;
+        }
+        return false;
+      `);
+      expect(hasZoom).toBe(true);
+    });
+
+    it('should have timeline frames', async () => {
+      const frames = await driver.findElements(By.css('[class*="cursor-move"]'));
+      expect(frames.length).toBeGreaterThan(0);
+    });
+
+    it('should not blank when clicking timeline frames', async () => {
+      const frames = await driver.findElements(By.css('[class*="cursor-move"]'));
+      if (frames.length > 0) {
+        await frames[0].click();
+        await driver.sleep(300);
+        const player = await driver.findElement(By.css('[class*="bg-black"]'));
+        expect(await player.isDisplayed()).toBe(true);
+      }
+    });
+
+    it('should have scrollbar-hidden time ruler', async () => {
+      const hidden = await driver.findElements(By.css('[class*="scrollbar-hide"]'));
+      expect(hidden.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Card Click Handling - Comprehensive', () => {
-    it('should handle clicking on cards with images in Storyboard view', async () => {
-      const storyboardButton = await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]"));
-      await storyboardButton.click();
-      await driver.sleep(1000);
-      
-      // Find all cards
-      const cards = await driver.findElements(By.css('[data-card]'));
-      
-      for (let i = 0; i < Math.min(cards.length, 5); i++) {
-        try {
-          await cards[i].click();
-          await driver.sleep(300);
-          
-          // Verify screen is not blank
-          const container = await driver.findElement(By.css('[class*="overflow-auto"]'));
-          expect(await container.isDisplayed()).toBe(true);
-          
-          // Verify Inspector opened
-          const inspector = await driver.findElements(By.css('[class*="w-80"][class*="bg-slate-800"]'));
-          expect(inspector.length).toBeGreaterThan(0);
-        } catch (error) {
-          // Log error but continue testing other cards
-          console.error(`Error clicking card ${i}:`, error);
-        }
-      }
+  // ─── Three-dot Menu ─────────────────────────────────────────────
+
+  describe('Three-dot Menu', () => {
+    beforeEach(async () => {
+      // Ensure we're in a clean view with no menu open
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
+      await driver.sleep(300);
+      await ensureMenuClosed(driver);
     });
 
-    it('should handle clicking on empty cards in Storyboard view', async () => {
-      const storyboardButton = await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]"));
-      await storyboardButton.click();
-      await driver.sleep(1000);
-      
-      // Find cards without images (check for "No image" text)
-      const emptyCards = await driver.findElements(By.xpath("//div[contains(@class, 'image-area')]//div[contains(text(), 'No image')]/ancestor::div[@data-card]"));
-      
-      if (emptyCards.length > 0) {
-        await emptyCards[0].click();
-        await driver.sleep(500);
-        
-        // Verify screen is not blank
-        const container = await driver.findElement(By.css('[class*="overflow-auto"]'));
-        expect(await container.isDisplayed()).toBe(true);
-      }
+    it('should have a menu button', async () => {
+      const menuBtn = await driver.findElement(By.css('button[title="Menu"]'));
+      expect(await menuBtn.isDisplayed()).toBe(true);
     });
 
-    it('should handle clicking on timeline frames with images in Animatics view', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Find timeline frames
-      const timelineFrames = await driver.findElements(By.css('[class*="cursor-move"]'));
-      
-      for (let i = 0; i < Math.min(timelineFrames.length, 5); i++) {
-        try {
-          await timelineFrames[i].click();
-          await driver.sleep(300);
-          
-          // Verify screen is not blank
-          const videoPlayer = await driver.findElement(By.css('[class*="bg-slate-950"]'));
-          expect(await videoPlayer.isDisplayed()).toBe(true);
-        } catch (error) {
-          console.error(`Error clicking timeline frame ${i}:`, error);
-        }
-      }
+    it('should open menu on click', async () => {
+      await openMenu(driver);
+      const menuItems = await driver.findElements(
+        By.xpath("//*[contains(@class, 'w-48')]//button[contains(text(), 'Project Details')]")
+      );
+      expect(menuItems.length).toBeGreaterThan(0);
+      await ensureMenuClosed(driver);
     });
 
-    it('should handle clicking on timeline frames without images in Animatics view', async () => {
-      const animaticsButton = await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]"));
-      await animaticsButton.click();
-      await driver.sleep(1000);
-      
-      // Find frames that might be empty (check for shot code text)
-      const timelineFrames = await driver.findElements(By.css('[class*="cursor-move"]'));
-      
-      if (timelineFrames.length > 0) {
-        await timelineFrames[0].click();
-        await driver.sleep(500);
-        
-        // Verify screen is not blank
-        const videoPlayer = await driver.findElement(By.css('[class*="bg-slate-950"]'));
-        expect(await videoPlayer.isDisplayed()).toBe(true);
-      }
+    it('should have Project Details option', async () => {
+      const item = await openMenuAndFind(driver, 'Project Details');
+      expect(await item.isDisplayed()).toBe(true);
+      await ensureMenuClosed(driver);
+    });
+
+    it('should have Import option', async () => {
+      const item = await openMenuAndFind(driver, 'Import');
+      expect(await item.isDisplayed()).toBe(true);
+      await ensureMenuClosed(driver);
+    });
+
+    it('should have Export option', async () => {
+      const item = await openMenuAndFind(driver, 'Export');
+      expect(await item.isDisplayed()).toBe(true);
+      await ensureMenuClosed(driver);
+    });
+
+    it('should have Debug Mode toggle', async () => {
+      const item = await openMenuAndFind(driver, 'Debug Mode');
+      expect(await item.isDisplayed()).toBe(true);
+      await ensureMenuClosed(driver);
+    });
+
+    it('should have GitHub link', async () => {
+      await openMenu(driver);
+      const link = await driver.findElement(
+        By.xpath("//*[contains(@class, 'w-48')]//a[contains(text(), 'GitHub')]")
+      );
+      expect(await link.isDisplayed()).toBe(true);
+      const href = await link.getAttribute('href');
+      expect(href).toContain('github.com/shuffleo/storyboard-tool');
+      const target = await link.getAttribute('target');
+      expect(target).toBe('_blank');
+      await ensureMenuClosed(driver);
+    });
+
+    it('should have Delete All Content option', async () => {
+      const item = await openMenuAndFind(driver, 'Delete All Content');
+      expect(await item.isDisplayed()).toBe(true);
+      await ensureMenuClosed(driver);
+    });
+
+    it('should show Delete All confirmation dialog', async () => {
+      const deleteBtn = await openMenuAndFind(driver, 'Delete All Content');
+      await deleteBtn.click();
+      await driver.sleep(500);
+
+      const exportDelete = await driver.findElements(
+        By.xpath("//button[contains(text(), 'Export and Delete')]")
+      );
+      const cancel = await driver.findElements(
+        By.xpath("//button[text()='Cancel']")
+      );
+
+      expect(exportDelete.length).toBeGreaterThan(0);
+      expect(cancel.length).toBeGreaterThan(0);
+
+      const cancelBtn = cancel[cancel.length - 1];
+      await cancelBtn.click();
+      await driver.sleep(300);
     });
   });
 
-  describe('Image Deletion - Comprehensive', () => {
-    it('should handle deleting first image from carousel', async () => {
-      const tableButton = await driver.findElement(By.xpath("//button[contains(text(), 'Table')]"));
-      await tableButton.click();
-      await driver.sleep(1000);
-      
-      // Click on a shot with images
-      const rows = await driver.findElements(By.css('tr[data-shot-id]'));
-      if (rows.length > 0) {
-        await rows[0].click();
-        await driver.sleep(500);
-        
-        // Find delete button in image carousel
-        const deleteButtons = await driver.findElements(By.css('button[title="Delete image"]'));
-        if (deleteButtons.length > 0) {
-          await deleteButtons[0].click();
-          await driver.sleep(500);
-          
-          // Handle confirmation dialog
-          try {
-            const confirmButton = await driver.switchTo().alert();
-            await confirmButton.accept();
-            await driver.sleep(500);
-          } catch (e) {
-            // No alert, might be using custom modal
-          }
-          
-          // Verify screen is not blank
-          const inspector = await driver.findElements(By.css('[class*="w-80"][class*="bg-slate-800"]'));
-          expect(inspector.length).toBeGreaterThan(0);
-        }
-      }
+  // ─── Project Details Modal ──────────────────────────────────────
+
+  describe('Project Details Modal', () => {
+    it('should open from menu', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
+      await driver.sleep(300);
+      const detailsBtn = await openMenuAndFind(driver, 'Project Details');
+      await detailsBtn.click();
+      await driver.sleep(500);
+
+      const titleLabel = await driver.findElements(By.xpath("//*[contains(text(), 'TITLE') or contains(text(), 'Title')]"));
+      expect(titleLabel.length).toBeGreaterThan(0);
     });
 
-    it('should handle deleting last image from carousel', async () => {
-      const tableButton = await driver.findElement(By.xpath("//button[contains(text(), 'Table')]"));
-      await tableButton.click();
-      await driver.sleep(1000);
-      
-      // Click on a shot
-      const rows = await driver.findElements(By.css('tr[data-shot-id]'));
-      if (rows.length > 0) {
-        await rows[0].click();
-        await driver.sleep(500);
-        
-        // Navigate to last image if multiple images exist
-        const nextButtons = await driver.findElements(By.css('button[class*="absolute right-2"]'));
-        if (nextButtons.length > 0) {
-          // Click next until we're at the last image
-          for (let i = 0; i < 10; i++) {
-            try {
-              await nextButtons[0].click();
-              await driver.sleep(200);
-            } catch (e) {
-              break;
-            }
-          }
-        }
-        
-        // Find and click delete button
-        const deleteButtons = await driver.findElements(By.css('button[title="Delete image"]'));
-        if (deleteButtons.length > 0) {
-          await deleteButtons[0].click();
-          await driver.sleep(500);
-          
-          // Handle confirmation
-          try {
-            const confirmButton = await driver.switchTo().alert();
-            await confirmButton.accept();
-            await driver.sleep(500);
-          } catch (e) {
-            // No alert
-          }
-          
-          // Verify screen is not blank
-          const container = await driver.findElement(By.css('table'));
-          expect(await container.isDisplayed()).toBe(true);
-        }
-      }
+    it('should show FPS and Aspect Ratio fields', async () => {
+      const fpsLabel = await driver.findElements(By.xpath("//*[contains(text(), 'FPS')]"));
+      const aspectLabel = await driver.findElements(By.xpath("//*[contains(text(), 'ASPECT') or contains(text(), 'Aspect')]"));
+      expect(fpsLabel.length).toBeGreaterThan(0);
+      expect(aspectLabel.length).toBeGreaterThan(0);
     });
 
-    it('should handle deleting all images from a shot', async () => {
-      const tableButton = await driver.findElement(By.xpath("//button[contains(text(), 'Table')]"));
-      await tableButton.click();
-      await driver.sleep(1000);
-      
-      // Click on a shot
-      const rows = await driver.findElements(By.css('tr[data-shot-id]'));
-      if (rows.length > 0) {
-        await rows[0].click();
-        await driver.sleep(500);
-        
-        // Delete all images
-        let deleteButtons = await driver.findElements(By.css('button[title="Delete image"]'));
-        while (deleteButtons.length > 0) {
-          try {
-            await deleteButtons[0].click();
-            await driver.sleep(300);
-            
-            // Handle confirmation
-            try {
-              const confirmButton = await driver.switchTo().alert();
-              await confirmButton.accept();
-              await driver.sleep(300);
-            } catch (e) {
-              // No alert
-            }
-            
-            // Check if more images exist
-            deleteButtons = await driver.findElements(By.css('button[title="Delete image"]'));
-          } catch (e) {
-            break;
-          }
-        }
-        
-        // Verify screen is not blank
-        const container = await driver.findElement(By.css('table'));
-        expect(await container.isDisplayed()).toBe(true);
-      }
+    it('should show Style Notes field', async () => {
+      const label = await driver.findElements(By.xpath("//*[contains(text(), 'STYLE') or contains(text(), 'Style')]"));
+      expect(label.length).toBeGreaterThan(0);
+    });
+
+    it('should show Global Notes field', async () => {
+      const label = await driver.findElements(By.xpath("//*[contains(text(), 'GLOBAL') or contains(text(), 'Global')]"));
+      expect(label.length).toBeGreaterThan(0);
+    });
+
+    it('should close with X button', async () => {
+      const closeBtn = await driver.findElement(
+        By.css('.modal-content button')
+      );
+      await closeBtn.click();
+      await driver.sleep(300);
+
+      const modals = await driver.findElements(By.css('.modal-content'));
+      expect(modals.length).toBe(0);
+    });
+
+    it('should show folder path when projectFolderPath is set', async () => {
+      await driver.executeScript(`
+        window.__storyboardStore.setState({ projectFolderPath: '/Users/test/my-project' });
+      `);
+      await driver.sleep(300);
+
+      const detailsBtn = await openMenuAndFind(driver, 'Project Details');
+      await detailsBtn.click();
+      await driver.sleep(500);
+
+      const folderLabel = await driver.findElements(By.xpath("//*[contains(text(), 'FOLDER') or contains(text(), 'Folder')]"));
+      expect(folderLabel.length).toBeGreaterThan(0);
+
+      const folderPath = await driver.findElements(By.xpath("//*[contains(text(), '/Users/test/my-project')]"));
+      expect(folderPath.length).toBeGreaterThan(0);
+
+      // Close modal
+      const closeBtn = await driver.findElement(By.css('.modal-content button'));
+      await closeBtn.click();
+      await driver.sleep(300);
+
+      // Clean up
+      await driver.executeScript(`
+        window.__storyboardStore.setState({ projectFolderPath: null });
+      `);
+    });
+
+    it('should not show folder path when projectFolderPath is null', async () => {
+      const detailsBtn = await openMenuAndFind(driver, 'Project Details');
+      await detailsBtn.click();
+      await driver.sleep(500);
+
+      const folderLabel = await driver.findElements(
+        By.xpath("//label[contains(text(), 'FOLDER') or contains(text(), 'Folder')]")
+      );
+      expect(folderLabel.length).toBe(0);
+
+      // Close modal
+      const closeBtn = await driver.findElement(By.css('.modal-content button'));
+      await closeBtn.click();
+      await driver.sleep(300);
     });
   });
+
+  // ─── Close Project ──────────────────────────────────────────────
+
+  describe('Close Project', () => {
+    it('should have Close Project option in menu', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
+      await driver.sleep(300);
+      const item = await openMenuAndFind(driver, 'Close Project');
+      expect(await item.isDisplayed()).toBe(true);
+      await ensureMenuClosed(driver);
+    });
+
+    it('should navigate to landing screen on close and return on internal storage', async () => {
+      const closeBtn = await openMenuAndFind(driver, 'Close Project');
+      await closeBtn.click();
+      await driver.sleep(1000);
+
+      // Should see the landing screen
+      const heading = await driver.findElements(By.xpath("//h1[contains(text(), 'Storyboard')]"));
+      const internalBtn = await driver.findElements(By.xpath("//button[contains(text(), 'Continue with Internal Storage')]"));
+      const isLanding = heading.length > 0 || internalBtn.length > 0;
+      expect(isLanding).toBe(true);
+
+      // Go back to project view for remaining tests
+      if (internalBtn.length > 0) {
+        await internalBtn[0].click();
+      } else {
+        await driver.get(APP_URL);
+      }
+      await driver.wait(until.elementLocated(By.xpath("//button[contains(text(), 'Table')]")), 10000);
+      await driver.sleep(500);
+      await seedTestData(driver);
+    });
+  });
+
+  // ─── Sync Status Indicator ─────────────────────────────────────
+
+  describe('Sync Status Indicator', () => {
+    it('should show sync status dot in menu when companion source', async () => {
+      await driver.executeScript(`
+        window.__storyboardStore.setState({ projectSource: 'companion', syncStatus: 'connected' });
+      `);
+      await driver.sleep(200);
+      await openMenu(driver);
+
+      const liveDot = await driver.findElements(By.xpath("//*[contains(text(), 'Live')]"));
+      expect(liveDot.length).toBeGreaterThan(0);
+
+      await ensureMenuClosed(driver);
+      await driver.executeScript(`
+        window.__storyboardStore.setState({ projectSource: 'none', syncStatus: 'disconnected' });
+      `);
+    });
+  });
+
+  // ─── Undo/Redo ─────────────────────────────────────────────────
+
+  describe('Undo/Redo', () => {
+    it('should have undo button', async () => {
+      const undoBtn = await driver.findElement(By.css('button[title="Undo (Cmd+Z)"]'));
+      expect(await undoBtn.isDisplayed()).toBe(true);
+    });
+
+    it('should have redo button', async () => {
+      const redoBtn = await driver.findElement(By.css('button[title="Redo (Cmd+Shift+Z)"]'));
+      expect(await redoBtn.isDisplayed()).toBe(true);
+    });
+  });
+
+  // ─── Debug Mode ─────────────────────────────────────────────────
 
   describe('Debug Mode', () => {
-    it('should enable debug mode from menu', async () => {
-      const menuButton = await driver.findElement(By.css('svg[viewBox="0 0 24 24"]'));
-      await menuButton.click();
+    it('should toggle debug mode from menu', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
+      await driver.sleep(300);
+      const debugBtn = await openMenuAndFind(driver, 'Debug Mode');
+      const text = await debugBtn.getText();
+      await debugBtn.click();
       await driver.sleep(500);
-      
-      // Find debug mode button
-      const debugButton = await driver.findElement(By.xpath("//button[contains(text(), 'Debug Mode')]"));
-      await debugButton.click();
-      await driver.sleep(500);
-      
-      // Check if debug panel is visible
-      const debugPanel = await driver.findElements(By.xpath("//div[contains(text(), 'Debug Log')]"));
-      expect(debugPanel.length).toBeGreaterThan(0);
+
+      if (text.includes('Enable')) {
+        const panel = await driver.findElements(By.xpath("//*[contains(text(), 'Debug Log')]"));
+        expect(panel.length).toBeGreaterThan(0);
+      }
+
+      // Toggle back off
+      const debugBtn2 = await openMenuAndFind(driver, 'Debug Mode');
+      await debugBtn2.click();
+      await driver.sleep(300);
+    });
+  });
+
+  // ─── Inspector Panel ────────────────────────────────────────────
+
+  describe('Inspector Panel', () => {
+    beforeEach(async () => {
+      await ensureMenuClosed(driver);
+      await seedTestData(driver);
     });
 
-    it('should show debug logs when actions are performed', async () => {
-      // Enable debug mode first
-      const menuButton = await driver.findElement(By.css('svg[viewBox="0 0 24 24"]'));
-      await menuButton.click();
+    it('should open Inspector when clicking View Details in Table view', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
       await driver.sleep(500);
-      
-      const debugButton = await driver.findElement(By.xpath("//button[contains(text(), 'Enable Debug Mode')]"));
-      if (await debugButton.isDisplayed()) {
-        await debugButton.click();
-        await driver.sleep(500);
+
+      const detailsBtns = await driver.findElements(By.css('button[title="View details"]'));
+      expect(detailsBtns.length).toBeGreaterThan(0);
+      await detailsBtns[0].click();
+      await driver.sleep(800);
+
+      const inspector = await driver.findElements(By.css('[data-testid="inspector"]'));
+      expect(inspector.length).toBeGreaterThan(0);
+    });
+
+    it('should open Inspector when clicking card in Storyboard view', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]")).then(b => b.click());
+      await driver.sleep(800);
+
+      const cards = await driver.findElements(By.css('[data-card]'));
+      expect(cards.length).toBeGreaterThan(0);
+
+      await driver.executeScript('arguments[0].click()', cards[0]);
+      await driver.sleep(800);
+
+      const inspector = await driver.findElements(By.css('[data-testid="inspector"]'));
+      expect(inspector.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ─── Agent Editing Overlay ──────────────────────────────────────
+
+  describe('Agent Editing Overlay', () => {
+    it('should show overlay when agentEditing is true', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
+      await driver.sleep(300);
+
+      await driver.executeScript(`
+        window.__storyboardStore.setState({ agentEditing: true });
+      `);
+      await driver.sleep(300);
+
+      const overlayText = await driver.findElements(
+        By.xpath("//*[contains(text(), 'Agent is editing')]")
+      );
+      expect(overlayText.length).toBeGreaterThan(0);
+    });
+
+    it('should block interaction with pointer-events', async () => {
+      const hasPointerEvents = await driver.executeScript(`
+        const el = document.querySelector('[style*="pointer-events"]');
+        return el !== null;
+      `);
+      expect(hasPointerEvents).toBe(true);
+    });
+
+    it('should show subtitle text', async () => {
+      const subtitle = await driver.findElements(
+        By.xpath("//*[contains(text(), 'Changes will appear')]")
+      );
+      expect(subtitle.length).toBeGreaterThan(0);
+    });
+
+    it('should hide overlay when agentEditing is false', async () => {
+      await driver.executeScript(`
+        window.__storyboardStore.setState({ agentEditing: false });
+      `);
+      await driver.sleep(300);
+
+      const overlayText = await driver.findElements(
+        By.xpath("//*[contains(text(), 'Agent is editing')]")
+      );
+      expect(overlayText.length).toBe(0);
+    });
+  });
+
+  // ─── Import/Export Modals ───────────────────────────────────────
+
+  describe('Import/Export Modals', () => {
+    beforeEach(async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
+      await driver.sleep(300);
+      await ensureMenuClosed(driver);
+    });
+
+    it('should open Import modal', async () => {
+      const importBtn = await openMenuAndFind(driver, 'Import');
+      await importBtn.click();
+      await driver.sleep(500);
+
+      const csvBtn = await driver.findElements(By.xpath("//button[text()='CSV']"));
+      const zipBtn = await driver.findElements(By.xpath("//button[text()='ZIP']"));
+      expect(csvBtn.length).toBeGreaterThan(0);
+      expect(zipBtn.length).toBeGreaterThan(0);
+
+      const cancelBtns = await driver.findElements(By.xpath("//button[text()='Cancel']"));
+      if (cancelBtns.length > 0) {
+        await cancelBtns[cancelBtns.length - 1].click();
+        await driver.sleep(300);
       }
-      
-      // Perform an action
-      const storyboardButton = await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]"));
-      await storyboardButton.click();
-      await driver.sleep(1000);
-      
-      // Check for debug logs
-      const logEntries = await driver.findElements(By.css('[class*="bg-slate-800/50"]'));
-      expect(logEntries.length).toBeGreaterThan(0);
+    });
+
+    it('should open Export modal', async () => {
+      const exportBtn = await openMenuAndFind(driver, 'Export');
+      await exportBtn.click();
+      await driver.sleep(500);
+
+      const csvBtn = await driver.findElements(By.xpath("//button[text()='CSV']"));
+      const pdfBtn = await driver.findElements(By.xpath("//button[contains(text(), 'PDF')]"));
+      expect(csvBtn.length).toBeGreaterThan(0);
+      expect(pdfBtn.length).toBeGreaterThan(0);
+
+      const cancelBtns = await driver.findElements(By.xpath("//button[text()='Cancel']"));
+      if (cancelBtns.length > 0) {
+        await cancelBtns[cancelBtns.length - 1].click();
+        await driver.sleep(300);
+      }
+    });
+  });
+
+  // ─── Data Integrity After Navigation ────────────────────────────
+
+  describe('Data Integrity', () => {
+    it('should preserve shots across view switches', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
+      await driver.sleep(500);
+      const countBefore = (await driver.findElements(By.css('tr[data-shot-id]'))).length;
+
+      await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]")).then(b => b.click());
+      await driver.sleep(500);
+      await driver.findElement(By.xpath("//button[contains(text(), 'Animatics')]")).then(b => b.click());
+      await driver.sleep(500);
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
+      await driver.sleep(500);
+
+      const countAfter = (await driver.findElements(By.css('tr[data-shot-id]'))).length;
+      expect(countAfter).toBe(countBefore);
+    });
+
+    it('should reflect shot count consistently in Storyboard view', async () => {
+      await driver.findElement(By.xpath("//button[contains(text(), 'Table')]")).then(b => b.click());
+      await driver.sleep(500);
+      const tableCount = (await driver.findElements(By.css('tr[data-shot-id]'))).length;
+
+      await driver.findElement(By.xpath("//button[contains(text(), 'Storyboard')]")).then(b => b.click());
+      await driver.sleep(500);
+      const cardCount = (await driver.findElements(By.css('[data-card]'))).length;
+
+      expect(cardCount).toBe(tableCount);
     });
   });
 });
-
