@@ -1,6 +1,12 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { ProjectState, ProjectSnapshot } from '../types';
 
+interface RecentProjectEntry {
+  title: string;
+  directoryHandle: FileSystemDirectoryHandle;
+  lastOpened: number;
+}
+
 interface StoryboardDB extends DBSchema {
   project: {
     key: string;
@@ -11,11 +17,17 @@ interface StoryboardDB extends DBSchema {
     value: { id: string; timestamp: number; description: string; snapshot: ProjectSnapshot };
     indexes: { 'by-timestamp': number };
   };
+  handles: {
+    key: string;
+    value: { key: string; handle: FileSystemDirectoryHandle; title: string; lastOpened: number };
+  };
 }
 
 const DB_NAME = 'storyboard-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const PROJECT_KEY = 'current-project';
+const HANDLE_KEY = 'last-directory';
+const RECENTS_KEY = 'recent-projects';
 
 class IndexedDBStorage {
   private db: IDBPDatabase<StoryboardDB> | null = null;
@@ -29,6 +41,9 @@ class IndexedDBStorage {
         if (!db.objectStoreNames.contains('versions')) {
           const versionStore = db.createObjectStore('versions', { keyPath: 'id' });
           versionStore.createIndex('by-timestamp', 'timestamp');
+        }
+        if (!db.objectStoreNames.contains('handles')) {
+          db.createObjectStore('handles');
         }
       },
     });
@@ -93,6 +108,48 @@ class IndexedDBStorage {
     if (!this.db) await this.init();
     await this.db!.clear('project');
     await this.db!.clear('versions');
+  }
+
+  async saveDirectoryHandle(handle: FileSystemDirectoryHandle, title: string): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.put('handles', {
+      key: HANDLE_KEY,
+      handle,
+      title,
+      lastOpened: Date.now(),
+    }, HANDLE_KEY);
+  }
+
+  async loadDirectoryHandle(): Promise<{ handle: FileSystemDirectoryHandle; title: string } | null> {
+    try {
+      if (!this.db) await this.init();
+      const entry = await this.db!.get('handles', HANDLE_KEY);
+      if (entry) return { handle: entry.handle, title: entry.title };
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async saveRecentProjects(projects: RecentProjectEntry[]): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.put('handles', {
+      key: RECENTS_KEY,
+      handle: null as any,
+      title: '',
+      lastOpened: 0,
+      ...({ recents: projects } as any),
+    }, RECENTS_KEY);
+  }
+
+  async loadRecentProjects(): Promise<RecentProjectEntry[]> {
+    try {
+      if (!this.db) await this.init();
+      const entry = await this.db!.get('handles', RECENTS_KEY);
+      return (entry as any)?.recents ?? [];
+    } catch {
+      return [];
+    }
   }
 }
 

@@ -6,63 +6,103 @@ import { AnimaticsView } from './views/AnimaticsView';
 import { Inspector } from './components/Inspector';
 import { TopBar } from './components/TopBar';
 import { DebugPanel } from './components/DebugPanel';
+import { LandingScreen } from './components/LandingScreen';
+import type { RecentProject } from './components/LandingScreen';
 import { debugLogger } from './utils/debug';
+import { detectFSACapabilities, hasPermission } from './sync/fileSystemAccess';
+import type { ProjectFolderHandle } from './sync/fileSystemAccess';
+import { db } from './db/indexeddb';
 
 export type ViewType = 'table' | 'storyboard' | 'animatics';
 
+type AppPhase = 'loading' | 'landing' | 'project';
+
 function App() {
   debugLogger.log('App', 'Component rendering');
-  // ALL hooks must be called before any conditional returns
   const init = useStore((state) => state.init);
   const project = useStore((state) => state.project);
+  const projectSource = useStore((state) => state.projectSource);
+  const syncStatus = useStore((state) => state.syncStatus);
+  const initSync = useStore((state) => state.initSync);
+  const teardownSync = useStore((state) => state.teardownSync);
+  const openProjectFromHandle = useStore((state) => state.openProjectFromHandle);
+  const closeProject = useStore((state) => state.closeProject);
   const [currentView, setCurrentView] = useState<ViewType>('table');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<'project' | 'scene' | 'shot' | 'frame' | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [appPhase, setAppPhase] = useState<AppPhase>('loading');
   const [debugMode, setDebugMode] = useState(debugLogger.isEnabled());
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
 
   useEffect(() => {
     debugLogger.log('App', 'Starting initialization');
     let mounted = true;
-    init()
-      .then(() => {
-        debugLogger.log('App', 'Initialization complete');
-        if (mounted) setIsInitialized(true);
-      })
-      .catch((error) => {
-        debugLogger.error('App', 'Failed to initialize', error);
-        if (mounted) setIsInitialized(true); // Still show the app even if init fails
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []); // Empty deps - only run once
 
-  // Listen for debug mode changes
-  useEffect(() => {
-    const checkDebugMode = () => {
-      setDebugMode(debugLogger.isEnabled());
+    const startup = async () => {
+      const capabilities = detectFSACapabilities();
+
+      if (capabilities.supported) {
+        const saved = await db.loadDirectoryHandle();
+        if (saved) {
+          try {
+            const granted = await hasPermission(saved.handle);
+            if (granted) {
+              await openProjectFromHandle({
+                directoryHandle: saved.handle,
+                projectFilePath: 'project.md',
+              });
+              if (mounted) setAppPhase('project');
+              return;
+            }
+          } catch {
+            debugLogger.log('App', 'Saved handle no longer valid');
+          }
+        }
+
+        const recents = await db.loadRecentProjects();
+        if (mounted) {
+          setRecentProjects(recents as RecentProject[]);
+          setAppPhase('landing');
+        }
+      } else {
+        await init();
+        if (mounted) setAppPhase('project');
+      }
     };
+
+    startup().catch((error) => {
+      debugLogger.error('App', 'Startup failed', error);
+      init().then(() => {
+        if (mounted) setAppPhase('project');
+      });
+    });
+
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (appPhase === 'project' && projectSource !== 'none') {
+      initSync();
+      return () => teardownSync();
+    }
+  }, [appPhase]);
+
+  useEffect(() => {
+    const checkDebugMode = () => setDebugMode(debugLogger.isEnabled());
     const interval = setInterval(checkDebugMode, 500);
     return () => clearInterval(interval);
   }, []);
 
-  // Apply retro skin on mount if enabled (default to true)
   useEffect(() => {
     const saved = localStorage.getItem('retroSkin');
     const retroSkinEnabled = saved === null ? true : saved === 'true';
-    if (retroSkinEnabled) {
-      document.documentElement.classList.add('retro-skin');
-    }
+    if (retroSkinEnabled) document.documentElement.classList.add('retro-skin');
   }, []);
 
-  // Update document title with project name
   useEffect(() => {
-    const projectTitle = project?.title || 'Untitled Project';
-    document.title = projectTitle;
+    document.title = project?.title || 'Untitled Project';
   }, [project?.title]);
 
-  // Clear selection when switching to Animatics view (Inspector should be hidden by default)
   useEffect(() => {
     if (currentView === 'animatics') {
       setSelectedId(null);
@@ -70,96 +110,84 @@ function App() {
     }
   }, [currentView]);
 
-  const handleSelect = useCallback((id: string, type: 'project' | 'scene' | 'shot' | 'frame') => {
-      debugLogger.log('App', 'handleSelect called', { 
-      id, 
-      type,
-      idType: typeof id,
-      idLength: id?.length,
-      typeType: typeof type,
-      previousId: selectedId,
-      previousType: selectedType,
-      currentView
-    });
-    
+  const handleProjectOpened = useCallback(async (handle: ProjectFolderHandle) => {
     try {
-      debugLogger.log('App', 'Validating handleSelect parameters', {
-        idExists: !!id,
-        idValid: !!id && id.length > 0,
-        typeExists: !!type,
-        typeValid: ['project', 'scene', 'shot', 'frame'].includes(type)
-      });
-      
-      if (!id || !type) {
-        debugLogger.warn('App', 'Invalid select: id or type is missing', { 
-          id, 
-          type,
-          idFalsy: !id,
-          typeFalsy: !type,
-          idValue: id,
-          typeValue: type
-        });
-        return;
-      }
-      
-      debugLogger.info('App', 'Setting selection state', { 
-        id, 
-        type, 
-        previousId: selectedId, 
-        previousType: selectedType,
-        willChange: selectedId !== id || selectedType !== type
-      });
-      
-      debugLogger.log('App', 'Calling setSelectedId', { 
-        oldId: selectedId,
-        newId: id,
-        idType: typeof id
-      });
-      setSelectedId(id);
-      debugLogger.log('App', 'setSelectedId called - state update queued');
-      
-      debugLogger.log('App', 'Calling setSelectedType', { 
-        oldType: selectedType,
-        newType: type,
-        typeType: typeof type
-      });
-      setSelectedType(type);
-      debugLogger.log('App', 'setSelectedType called - state update queued');
-      
-      debugLogger.log('App', 'Selection state updates queued successfully', {
-        newId: id,
-        newType: type,
-        note: 'React will batch these updates and re-render'
-      });
-    } catch (error) {
-      debugLogger.error('App', 'Error in handleSelect - EXCEPTION CAUGHT', error, { 
-        id, 
-        type,
-        errorName: error instanceof Error ? error.name : typeof error,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        previousId: selectedId,
-        previousType: selectedType
-      });
+      await openProjectFromHandle(handle);
+      const recents = await db.loadRecentProjects();
+      const existing = recents.findIndex(
+        (r: any) => r.directoryHandle === handle.directoryHandle
+      );
+      const entry = {
+        title: useStore.getState().project.title,
+        directoryHandle: handle.directoryHandle,
+        lastOpened: Date.now(),
+      };
+      const updated = existing >= 0
+        ? [entry, ...recents.filter((_: any, i: number) => i !== existing)]
+        : [entry, ...recents];
+      await db.saveRecentProjects(updated.slice(0, 10) as any);
+      setAppPhase('project');
+    } catch (err: any) {
+      console.error('Failed to open project:', err);
     }
-  }, [selectedId, selectedType, currentView]);
+  }, [openProjectFromHandle]);
 
-  if (!isInitialized) {
-    console.log('App: Not initialized, showing loading screen');
+  const handleFallbackLoad = useCallback(async () => {
+    await init();
+    setAppPhase('project');
+  }, [init]);
+
+  const handleCloseProject = useCallback(() => {
+    closeProject();
+    setAppPhase('landing');
+    setSelectedId(null);
+    setSelectedType(null);
+  }, [closeProject]);
+
+  const handleRemoveRecent = useCallback(async (index: number) => {
+    setRecentProjects((prev) => prev.filter((_, i) => i !== index));
+    const recents = await db.loadRecentProjects();
+    const updated = recents.filter((_: any, i: number) => i !== index);
+    await db.saveRecentProjects(updated as any);
+  }, []);
+
+  const handleSelect = useCallback((id: string, type: 'project' | 'scene' | 'shot' | 'frame') => {
+    if (!id || !type) return;
+    setSelectedId(id);
+    setSelectedType(type);
+  }, []);
+
+  if (appPhase === 'loading') {
     return (
-      <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div style={{ color: '#6b7280', fontSize: '16px' }}>Loading...</div>
+      <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a' }}>
+        <div style={{ color: '#94a3b8', fontSize: '16px' }}>Loading...</div>
       </div>
     );
   }
-  
-  console.log('App: Initialized, rendering main app');
-  console.log('App: Project state:', project ? 'exists' : 'null');
 
-  // Always show TopBar, even if project is null (it will handle it)
+  if (appPhase === 'landing') {
+    return (
+      <>
+        <LandingScreen
+          onProjectOpened={handleProjectOpened}
+          onFallbackLoad={handleFallbackLoad}
+          recentProjects={recentProjects}
+          onRemoveRecent={handleRemoveRecent}
+        />
+        <DebugPanel enabled={debugMode} />
+      </>
+    );
+  }
+
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0f172a' }}>
-      <TopBar currentView={currentView} onViewChange={setCurrentView} />
+      <TopBar
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        projectSource={projectSource}
+        syncStatus={syncStatus}
+        onCloseProject={handleCloseProject}
+      />
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           {project && currentView === 'table' && <TableView onSelect={handleSelect} />}
@@ -168,7 +196,6 @@ function App() {
           {!project && (
             <div style={{ padding: '20px', color: '#e2e8f0', fontSize: '14px' }}>
               <div style={{ marginBottom: '10px' }}>No project loaded.</div>
-              <div style={{ fontSize: '12px', color: '#94a3b8' }}>Check browser console (F12) for initialization logs.</div>
             </div>
           )}
         </div>
@@ -178,18 +205,15 @@ function App() {
             selectedType={selectedType}
             currentView={currentView}
             onClose={() => {
-              debugLogger.log('App', 'Closing Inspector');
               setSelectedId(null);
               setSelectedType(null);
             }}
           />
         )}
       </div>
-      {/* DebugPanel rendered via portal to body - always visible */}
       <DebugPanel enabled={debugMode} />
     </div>
   );
 }
 
 export default App;
-

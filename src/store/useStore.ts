@@ -2,6 +2,14 @@ import { create } from 'zustand';
 import { ProjectState, Shot, Scene, StoryboardFrame, Sequence, Project } from '../types';
 import { db } from '../db/indexeddb';
 import { nanoid } from 'nanoid';
+import type { ProjectFolderHandle } from '../sync/fileSystemAccess';
+import { loadProject, debouncedSaveProject } from '../sync/projectLoader';
+import { SyncClient, type SyncStatus, type SyncConfig } from '../sync/wsClient';
+import { applyDiff } from '../../server/diffEngine';
+import type { DiffOp } from '../../server/protocol';
+import { assetResolver } from '../sync/assetResolver';
+
+export type ProjectSource = 'none' | 'fsa' | 'indexeddb' | 'companion';
 
 interface Store extends ProjectState {
   // Actions
@@ -50,6 +58,18 @@ interface Store extends ProjectState {
   isSaving: boolean;
   lastSaved: number | null;
   
+  // Project folder
+  projectHandle: ProjectFolderHandle | null;
+  projectSource: ProjectSource;
+  openProjectFromHandle: (handle: ProjectFolderHandle) => Promise<void>;
+  closeProject: () => void;
+  
+  // Sync
+  syncClient: SyncClient | null;
+  syncStatus: SyncStatus;
+  initSync: (config?: Partial<SyncConfig>) => void;
+  teardownSync: () => void;
+  handleExternalDiff: (ops: DiffOp[]) => void;
   
   // Clear all content
   clearAllContent: () => Promise<void>;
@@ -82,6 +102,10 @@ export const useStore = create<Store>((set, get) => ({
   historyIndex: -1,
   canUndo: false,
   canRedo: false,
+  projectHandle: null,
+  projectSource: 'none',
+  syncClient: null,
+  syncStatus: 'disconnected' as SyncStatus,
 
   init: async () => {
     try {
@@ -95,7 +119,7 @@ export const useStore = create<Store>((set, get) => ({
       const saved = await db.loadProject();
       if (saved) {
         console.log('Store: Project loaded from IndexedDB');
-        set({ ...saved, history: [saved], historyIndex: 0, canUndo: false, canRedo: false });
+        set({ ...saved, projectSource: 'indexeddb', history: [saved], historyIndex: 0, canUndo: false, canRedo: false });
       } else {
         console.log('Store: No saved project, creating default...');
         // Create default project with 3 scenes and 5 shots each
@@ -125,6 +149,7 @@ export const useStore = create<Store>((set, get) => ({
               sceneId: sceneId,
               orderIndex: sceneNum * 5 + shotNum,
               shotCode,
+              title: '',
               scriptText: '',
               duration: 500, // Default 500ms
               tags: [],
@@ -142,7 +167,7 @@ export const useStore = create<Store>((set, get) => ({
           frames: [],
           versions: [],
         };
-        set({ ...state, history: [state], historyIndex: 0, canUndo: false, canRedo: false });
+        set({ ...state, projectSource: 'indexeddb', history: [state], historyIndex: 0, canUndo: false, canRedo: false });
         await db.saveProject(state);
         console.log('Store: Default project created and saved');
       }
@@ -380,6 +405,7 @@ export const useStore = create<Store>((set, get) => ({
       sceneId: targetSceneId,
       orderIndex: maxOrder + 1,
       shotCode,
+      title: '',
       scriptText: '',
       duration: 500, // Default 500ms
       tags: [],
@@ -574,18 +600,147 @@ export const useStore = create<Store>((set, get) => ({
     get().save();
   },
 
-  save: async () => {
-    set({ isSaving: true });
+  openProjectFromHandle: async (handle: ProjectFolderHandle) => {
     try {
-      const state = get();
-      await db.saveProject({
+      const { state } = await loadProject(handle);
+      set({
+        ...state,
+        projectHandle: handle,
+        projectSource: 'fsa',
+        history: [state],
+        historyIndex: 0,
+        canUndo: false,
+        canRedo: false,
+      });
+      await db.saveDirectoryHandle(handle.directoryHandle, state.project.title);
+      await db.saveProject(state);
+    } catch (error) {
+      console.error('Failed to open project from folder:', error);
+      throw error;
+    }
+  },
+
+  closeProject: () => {
+    const state = get();
+    if (state.syncClient) {
+      state.syncClient.disconnect();
+    }
+    if (state.projectSource === 'fsa' && state.projectHandle) {
+      const currentState: ProjectState = {
         project: state.project,
         sequences: state.sequences,
         scenes: state.scenes,
         shots: state.shots,
         frames: state.frames,
         versions: state.versions,
+      };
+      debouncedSaveProject(state.projectHandle, currentState, 0);
+    }
+    assetResolver.revokeAll();
+    set({
+      project: defaultProject,
+      sequences: [],
+      scenes: [],
+      shots: [],
+      frames: [],
+      versions: [],
+      projectHandle: null,
+      projectSource: 'none',
+      syncClient: null,
+      syncStatus: 'disconnected' as SyncStatus,
+      history: [],
+      historyIndex: -1,
+      canUndo: false,
+      canRedo: false,
+    });
+  },
+
+  initSync: (config?: Partial<SyncConfig>) => {
+    const state = get();
+    if (state.syncClient) state.syncClient.disconnect();
+
+    const client = new SyncClient(config);
+
+    client.onStatusChange((status) => {
+      set({ syncStatus: status });
+      if (status === 'connected') {
+        set({ projectSource: 'companion' });
+        assetResolver.setCompanionUrl(client.assetBaseUrl);
+      } else if (status === 'disconnected') {
+        const current = get();
+        if (current.projectSource === 'companion') {
+          set({ projectSource: current.projectHandle ? 'fsa' : 'indexeddb' });
+          assetResolver.setCompanionUrl(null);
+        }
+      }
+    });
+
+    client.onFullSync((newState) => {
+      set({
+        ...newState,
+        history: [newState],
+        historyIndex: 0,
+        canUndo: false,
+        canRedo: false,
       });
+    });
+
+    client.onDiff((ops) => {
+      get().handleExternalDiff(ops);
+    });
+
+    set({ syncClient: client });
+    client.connect();
+  },
+
+  teardownSync: () => {
+    const state = get();
+    if (state.syncClient) {
+      state.syncClient.disconnect();
+      set({ syncClient: null, syncStatus: 'disconnected' as SyncStatus });
+    }
+  },
+
+  handleExternalDiff: (ops: DiffOp[]) => {
+    const state = get();
+    const currentState: ProjectState = {
+      project: state.project,
+      sequences: state.sequences,
+      scenes: state.scenes,
+      shots: state.shots,
+      frames: state.frames,
+      versions: state.versions,
+    };
+    const newState = applyDiff(currentState, ops);
+    set({
+      project: newState.project,
+      sequences: newState.sequences,
+      scenes: newState.scenes,
+      shots: newState.shots,
+      frames: newState.frames,
+      versions: newState.versions,
+    });
+  },
+
+  save: async () => {
+    set({ isSaving: true });
+    try {
+      const state = get();
+      const projectState: ProjectState = {
+        project: state.project,
+        sequences: state.sequences,
+        scenes: state.scenes,
+        shots: state.shots,
+        frames: state.frames,
+        versions: state.versions,
+      };
+
+      await db.saveProject(projectState);
+
+      if (state.projectSource === 'fsa' && state.projectHandle) {
+        debouncedSaveProject(state.projectHandle, projectState);
+      }
+
       const savedTime = Date.now();
       set({ lastSaved: savedTime, isSaving: false });
     } catch (error) {
@@ -620,6 +775,7 @@ export const useStore = create<Store>((set, get) => ({
           sceneId: sceneId,
           orderIndex: sceneNum * 5 + shotNum,
           shotCode,
+          title: '',
           scriptText: '',
           duration: 1000,
           tags: [],

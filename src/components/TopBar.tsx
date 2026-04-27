@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { ViewType } from '../App';
-import { useStore } from '../store/useStore';
+import { useStore, ProjectSource } from '../store/useStore';
+import type { SyncStatus } from '../sync/wsClient';
 import { exportToCSV, exportStoryboardPDF, exportToZIP, exportAnimaticsToMP4, downloadFile, importFromCSV, importFromZIP, importImages, exportIndexedDB, importIndexedDB } from '../utils/importExport';
 import { debugLogger } from '../utils/debug';
 
 interface TopBarProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
+  projectSource?: ProjectSource;
+  syncStatus?: SyncStatus;
+  onCloseProject?: () => void;
 }
 
-export function TopBar({ currentView, onViewChange }: TopBarProps) {
+export function TopBar({ currentView, onViewChange, projectSource, syncStatus, onCloseProject }: TopBarProps) {
   const project = useStore((state) => state.project);
   const updateProject = useStore((state) => state.updateProject);
   const isSaving = useStore((state) => state.isSaving);
@@ -400,6 +404,23 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
           {menuOpen && (
             <div className="absolute right-0 mt-1 w-48 bg-slate-800 border border-slate-700 rounded shadow-lg z-50">
               <div className="py-1">
+                {projectSource && projectSource !== 'none' && (
+                  <div className="px-4 py-1.5 text-xs text-slate-500 border-b border-slate-700 flex items-center gap-2">
+                    <span
+                      className="inline-block w-2 h-2 rounded-full"
+                      style={{
+                        backgroundColor:
+                          syncStatus === 'connected' ? '#22c55e' :
+                          syncStatus === 'connecting' ? '#eab308' :
+                          '#6b7280',
+                      }}
+                    />
+                    {syncStatus === 'connected' ? 'Live' :
+                     syncStatus === 'connecting' ? 'Connecting...' :
+                     projectSource === 'fsa' ? 'Local Folder' :
+                     projectSource === 'companion' ? 'Companion' : 'Internal Storage'}
+                  </div>
+                )}
                 <button
                   onClick={() => {
                     setMenuOpen(false);
@@ -409,6 +430,17 @@ export function TopBar({ currentView, onViewChange }: TopBarProps) {
                 >
                   Project Details
                 </button>
+                {onCloseProject && (
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onCloseProject();
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                  >
+                    Close Project
+                  </button>
+                )}
                 {showInstallPrompt && (
                   <button
                     onClick={() => {

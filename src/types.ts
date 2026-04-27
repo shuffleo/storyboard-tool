@@ -35,6 +35,7 @@ export interface Shot {
   sceneId?: string;
   orderIndex: number; // Global canonical order
   shotCode: string; // e.g. "010", "020", "030"
+  title: string; // From heading "### 2s: {title}"
   scriptText: string;
   duration: number; // milliseconds, minimum 300ms
   tags: string[];
