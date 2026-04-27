@@ -102,6 +102,131 @@ All data is stored locally in IndexedDB. The canonical data structure includes:
 - **Shift+Click**: Range select shots (Storyboard view)
 
 
+## Agent Integration (MCP + Companion Server)
+
+This storyboard tool can be controlled by AI agents via a local companion server that exposes an MCP (Model Context Protocol) interface and live WebSocket sync to the PWA.
+
+### Architecture
+
+```
+┌─────────────┐    WebSocket     ┌──────────────────┐    File System    ┌─────────────────┐
+│   PWA        │◄───────────────►│ Companion Server │◄────────────────►│ Markdown Files  │
+│ (Browser)    │   live sync     │  (Node.js)       │   read/write     │ on disk         │
+└─────────────┘                  └──────────────────┘                  └─────────────────┘
+                                        ▲
+                                        │ MCP (stdio)
+                                        ▼
+                                 ┌──────────────┐
+                                 │  AI Agent    │
+                                 │  (Cursor,    │
+                                 │   Claude,    │
+                                 │   etc.)      │
+                                 └──────────────┘
+```
+
+### Quick Start
+
+**1. Start the companion server** pointing to a project folder:
+
+```bash
+npx tsx server/index.ts --project /path/to/my-storyboard
+```
+
+This starts:
+- WebSocket server on `ws://localhost:9800` (live sync)
+- Asset server on `http://localhost:9801` (image serving)
+- File watcher for automatic change detection
+
+**2. Open the PWA** in Chrome/Edge. It auto-connects to the companion server and loads the project.
+
+**3. The agent** uses MCP tools (via stdio) or edits markdown files directly. Changes sync to the PWA in real-time.
+
+### Markdown Project Format
+
+Projects are stored as plain markdown files — easy for agents to read and edit:
+
+```
+my-storyboard/
+├── project.md           # Project metadata (title, fps, aspect ratio, notes)
+├── scene-001.md         # One file per scene
+├── scene-002.md
+└── assets/              # Media files
+    └── sc001-sh010-f01.png
+```
+
+**`project.md`** uses YAML frontmatter for metadata, with sections for Style Notes, Reference Links, and Global Notes.
+
+**`scene-NNN.md`** contains scene metadata in frontmatter, a scene summary, and shots as `###` headings:
+
+```markdown
+<!-- shot: {"id":"k7x2m","tags":["wide"]} -->
+### 2s: Wide shot - city skyline
+
+Script text describing the action.
+
+> Camera direction and general notes.
+
+![frame](assets/sc001-sh010-f01.png "Caption")
+```
+
+### MCP Tools
+
+Eight tools are available for structured operations:
+
+| Tool | Purpose |
+|------|---------|
+| `storyboard_read` | Read project state (all, project, scenes, shots, frames) |
+| `storyboard_write` | Batch create/update/delete operations |
+| `storyboard_reorder` | Reorder scenes, shots, or frames |
+| `storyboard_import` | Import from JSON or CSV |
+| `storyboard_export` | Export to JSON or CSV |
+| `storyboard_timeline` | Get computed timeline or set shot durations |
+| `storyboard_assets` | List, add, or delete assets in the assets/ folder |
+| `storyboard_sync` | Control sync state (status, pull, push, watch/unwatch) |
+
+### When to Edit Files vs Use MCP Tools
+
+**Edit markdown files directly** for bulk text changes, find-and-replace, adding/removing entire scenes, or restructuring. The file watcher picks up changes within ~500ms.
+
+**Use MCP tools** for atomic batch operations with validation, reading computed state (timeline), managing binary assets, or triggering immediate sync.
+
+### Agent Skill File
+
+A comprehensive skill file is available at `.agents/skills/storyboard/SKILL.md` with:
+- Full markdown format specification
+- Data model reference
+- All MCP tool schemas with examples
+- Best practices and common workflow patterns
+
+Point your agent to this file for complete documentation.
+
+### Common Agent Workflows
+
+**Create a storyboard from a script:**
+1. Parse the script into scenes and shots
+2. Write `scene-NNN.md` files with shot headings, script text, and durations
+3. Call `storyboard_sync("pull")` to load into the companion
+
+**Generate and attach images:**
+1. `storyboard_read("shots")` to get all shots
+2. Generate images from script text
+3. `storyboard_assets("add", { data, filename, shot_id })` for each
+
+**Adjust animatic timing:**
+1. `storyboard_timeline("get_timeline")` to see current timing
+2. `storyboard_timeline("set_durations", { "sh1": 3000, "sh2": 1500 })`
+
+### Server Options
+
+```bash
+npx tsx server/index.ts --project /path/to/project [options]
+
+Options:
+  --ws-port <port>      WebSocket port (default: 9800)
+  --asset-port <port>   Asset server port (default: 9801)
+  --debounce <ms>       File watcher debounce (default: 300)
+```
+
 ## Browser Support
 
 Modern browsers with IndexedDB support:
