@@ -8,6 +8,7 @@ import { SyncClient, type SyncStatus, type SyncConfig } from '../sync/wsClient';
 import { applyDiff } from '../../server/diffEngine';
 import type { DiffOp } from '../../server/protocol';
 import { assetResolver } from '../sync/assetResolver';
+import { clearAssetCache } from '../components/CachedImage';
 
 export type ProjectSource = 'none' | 'fsa' | 'indexeddb' | 'companion';
 
@@ -617,6 +618,7 @@ export const useStore = create<Store>((set, get) => ({
         canUndo: false,
         canRedo: false,
       });
+      assetResolver.setProjectHandle(handle);
       await db.saveDirectoryHandle(handle.directoryHandle, state.project.title);
       await db.saveProject(state);
     } catch (error) {
@@ -641,7 +643,9 @@ export const useStore = create<Store>((set, get) => ({
       };
       debouncedSaveProject(state.projectHandle, currentState, 0);
     }
+    assetResolver.setProjectHandle(null);
     assetResolver.revokeAll();
+    clearAssetCache();
     set({
       project: defaultProject,
       sequences: [],

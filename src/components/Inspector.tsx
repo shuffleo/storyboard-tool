@@ -1,8 +1,9 @@
 import React from 'react';
-import { useStore, resolveAssetUrl } from '../store/useStore';
+import { useStore } from '../store/useStore';
 import { Shot, Scene, StoryboardFrame, Project } from '../types';
 import { debugLogger } from '../utils/debug';
 import { MarkdownField } from './MarkdownField';
+import { CachedImage } from './CachedImage';
 
 interface InspectorProps {
   selectedId: string | null;
@@ -612,8 +613,8 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                   </div>
                   <div className="relative min-h-[120px] flex items-center justify-center">
                     {currentFrame?.image ? (
-                      <img
-                        src={resolveAssetUrl(currentFrame.image)}
+                      <CachedImage
+                        src={currentFrame.image}
                         alt={`Frame ${currentImageIndex + 1}`}
                         className="w-full rounded-md border border-slate-600"
                         onError={(e) => {
@@ -703,8 +704,8 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
               />
             </div>
             <div>
-              <img
-                src={resolveAssetUrl((item as StoryboardFrame).image)}
+              <CachedImage
+                src={(item as StoryboardFrame).image}
                 alt={(item as StoryboardFrame).caption}
                 className="w-full rounded-md border border-slate-600"
               />

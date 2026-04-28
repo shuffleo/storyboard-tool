@@ -21,10 +21,14 @@ interface StoryboardDB extends DBSchema {
     key: string;
     value: { key: string; handle: FileSystemDirectoryHandle; title: string; lastOpened: number };
   };
+  'image-cache': {
+    key: string;
+    value: { path: string; blob: Blob; lastAccessed: number };
+  };
 }
 
 const DB_NAME = 'storyboard-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const PROJECT_KEY = 'current-project';
 const HANDLE_KEY = 'last-directory';
 const RECENTS_KEY = 'recent-projects';
@@ -44,6 +48,9 @@ class IndexedDBStorage {
         }
         if (!db.objectStoreNames.contains('handles')) {
           db.createObjectStore('handles');
+        }
+        if (!db.objectStoreNames.contains('image-cache')) {
+          db.createObjectStore('image-cache', { keyPath: 'path' });
         }
       },
     });
@@ -149,6 +156,38 @@ class IndexedDBStorage {
       return (entry as any)?.recents ?? [];
     } catch {
       return [];
+    }
+  }
+
+  async cacheImage(path: string, blob: Blob): Promise<void> {
+    try {
+      if (!this.db) await this.init();
+      await this.db!.put('image-cache', { path, blob, lastAccessed: Date.now() });
+    } catch (error) {
+      console.warn('IndexedDB: Failed to cache image:', error);
+    }
+  }
+
+  async getCachedImage(path: string): Promise<Blob | null> {
+    try {
+      if (!this.db) await this.init();
+      const entry = await this.db!.get('image-cache', path);
+      if (entry) {
+        this.db!.put('image-cache', { ...entry, lastAccessed: Date.now() }).catch(() => {});
+        return entry.blob;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async clearImageCache(): Promise<void> {
+    try {
+      if (!this.db) await this.init();
+      await this.db!.clear('image-cache');
+    } catch (error) {
+      console.warn('IndexedDB: Failed to clear image cache:', error);
     }
   }
 }

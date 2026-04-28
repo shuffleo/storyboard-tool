@@ -9,9 +9,11 @@ import { DebugPanel } from './components/DebugPanel';
 import { LandingScreen } from './components/LandingScreen';
 import type { RecentProject } from './components/LandingScreen';
 import { debugLogger } from './utils/debug';
-import { detectFSACapabilities, hasPermission } from './sync/fileSystemAccess';
+import { detectFSACapabilities, hasPermission, requestPermission } from './sync/fileSystemAccess';
 import type { ProjectFolderHandle } from './sync/fileSystemAccess';
 import { db } from './db/indexeddb';
+import { ToastProvider } from './components/Toast';
+import { SyncToastBridge } from './components/SyncToastBridge';
 
 export type ViewType = 'table' | 'storyboard' | 'animatics';
 
@@ -53,7 +55,10 @@ function App() {
         const saved = await db.loadDirectoryHandle();
         if (saved) {
           try {
-            const granted = await hasPermission(saved.handle);
+            let granted = await hasPermission(saved.handle);
+            if (!granted) {
+              granted = await requestPermission(saved.handle);
+            }
             if (granted) {
               await openProjectFromHandle({
                 directoryHandle: saved.handle,
@@ -175,7 +180,7 @@ function App() {
 
   if (appPhase === 'landing') {
     return (
-      <>
+      <ToastProvider>
         <LandingScreen
           onProjectOpened={handleProjectOpened}
           onFallbackLoad={handleFallbackLoad}
@@ -183,11 +188,12 @@ function App() {
           onRemoveRecent={handleRemoveRecent}
         />
         <DebugPanel enabled={debugMode} />
-      </>
+      </ToastProvider>
     );
   }
 
   return (
+    <ToastProvider>
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0f172a', position: 'relative' }}>
       <TopBar
         currentView={currentView}
@@ -196,6 +202,7 @@ function App() {
         syncStatus={syncStatus}
         onCloseProject={handleCloseProject}
       />
+      <SyncToastBridge />
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           {project && currentView === 'table' && <TableView onSelect={handleSelect} />}
@@ -258,6 +265,7 @@ function App() {
       )}
       <DebugPanel enabled={debugMode} />
     </div>
+    </ToastProvider>
   );
 }
 

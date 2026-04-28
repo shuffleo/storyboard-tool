@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { useStore, resolveAssetUrl } from '../store/useStore';
+import { useStore } from '../store/useStore';
 import { Shot } from '../types';
+import { CachedImage } from '../components/CachedImage';
 
 interface TableViewProps {
   onSelect: (id: string, type: 'project' | 'scene' | 'shot' | 'frame') => void;
@@ -450,8 +451,8 @@ export function TableView({ onSelect }: TableViewProps) {
             transform: 'translate(-50%, -50%)',
           }}
         >
-          <img
-            src={resolveAssetUrl(hoverPreview.image)}
+          <CachedImage
+            src={hoverPreview.image}
             alt="Preview"
             className="max-w-md max-h-md border-2 border-slate-600 rounded shadow-2xl"
             style={{ maxWidth: '400px', maxHeight: '400px', objectFit: 'contain' }}
@@ -991,8 +992,8 @@ const ImageThumbnail = React.memo(function ImageThumbnail({
         onMouseLeave={handleMouseLeave}
         onMouseMove={handleMouseMove}
       >
-        <img
-          src={resolveAssetUrl(frames[currentImageIndex]?.image || frames[0]?.image)}
+        <CachedImage
+          src={frames[currentImageIndex]?.image || frames[0]?.image}
           alt=""
           className="w-full h-full object-cover rounded border border-slate-600"
         />

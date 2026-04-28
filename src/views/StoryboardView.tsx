@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { useStore, resolveAssetUrl } from '../store/useStore';
+import { useStore } from '../store/useStore';
 import { debugLogger } from '../utils/debug';
 import { MarkdownInline } from '../components/MarkdownField';
+import { CachedImage } from '../components/CachedImage';
 
 interface StoryboardViewProps {
   onSelect: (id: string, type: 'project' | 'scene' | 'shot' | 'frame') => void;
@@ -631,8 +632,8 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
           >
             {shotFrames.length > 0 ? (
               <>
-                <img
-                  src={resolveAssetUrl(shotFrames[currentImageIndex.get(shot.id) || 0]?.image || shotFrames[0].image)}
+                <CachedImage
+                  src={shotFrames[currentImageIndex.get(shot.id) || 0]?.image || shotFrames[0].image}
                   alt={shot.shotCode}
                   className="absolute inset-0 w-full h-full object-cover rounded"
                   style={{ objectFit: 'cover' }}

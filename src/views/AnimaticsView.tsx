@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { useStore, resolveAssetUrl } from '../store/useStore';
+import { useStore } from '../store/useStore';
 import { Shot } from '../types';
 import { debugLogger } from '../utils/debug';
+import { CachedImage, useAssetUrl } from '../components/CachedImage';
 
 interface AnimaticsViewProps {
   onSelect: (id: string, type: 'project' | 'scene' | 'shot' | 'frame') => void;
@@ -108,20 +109,20 @@ export function AnimaticsView({ onSelect }: AnimaticsViewProps) {
 
   // Get current frame image with error handling
   const [imageError, setImageError] = useState<string | null>(null);
-  const currentFrameImage = useMemo(() => {
-    if (!currentFrame || !currentFrame.shotId) return null;
+  const currentFrameRawPath = useMemo(() => {
+    if (!currentFrame || !currentFrame.shotId) return undefined;
     try {
       const shotFrames = frames
         .filter(f => f && f.shotId === currentFrame.shotId)
         .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
-      if (shotFrames.length === 0) return null;
-      const raw = shotFrames[currentFrame.frameIndex]?.image || shotFrames[0]?.image || null;
-      return raw ? resolveAssetUrl(raw) : null;
+      if (shotFrames.length === 0) return undefined;
+      return shotFrames[currentFrame.frameIndex]?.image || shotFrames[0]?.image || undefined;
     } catch (error) {
       console.error('Error getting current frame image:', error);
-      return null;
+      return undefined;
     }
   }, [currentFrame, frames]);
+  const { url: currentFrameImage } = useAssetUrl(currentFrameRawPath);
 
   const handleImageError = () => {
     if (currentFrame) {
@@ -683,7 +684,7 @@ export function AnimaticsView({ onSelect }: AnimaticsViewProps) {
               
               
               const shotFrames = frames.filter(f => f && f.shotId === frame.shotId).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
-              const frameImage = resolveAssetUrl(shotFrames[0]?.image);
+              const frameImagePath = shotFrames[0]?.image;
               const isSelected = selectedShotId === frame.shotId;
               const isDragging = dragShotId === frame.shotId;
               const isFromOtherScene = dragShotId && frame.shot.sceneId !== draggingSceneId;
@@ -723,9 +724,9 @@ export function AnimaticsView({ onSelect }: AnimaticsViewProps) {
                     
                     {/* Thumbnail */}
                     <div className="flex-1 p-1 overflow-hidden">
-                      {frameImage ? (
-                        <img
-                          src={frameImage}
+                      {frameImagePath ? (
+                        <CachedImage
+                          src={frameImagePath}
                           alt={frame.shot.shotCode}
                           className="w-full h-full object-cover rounded max-h-24"
                           draggable={false}

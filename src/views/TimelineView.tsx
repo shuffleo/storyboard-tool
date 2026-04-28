@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { useStore, resolveAssetUrl } from '../store/useStore';
+import { useStore } from '../store/useStore';
 import { Shot } from '../types';
+import { CachedImage } from '../components/CachedImage';
 
 interface TimelineViewProps {
   onSelect: (id: string, type: 'project' | 'scene' | 'shot' | 'frame') => void;
@@ -133,8 +134,8 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
                             onClick={() => onSelect(shot.id, 'shot')}
                           >
                             {shotFrames.length > 0 ? (
-                              <img
-                                src={resolveAssetUrl(shotFrames[0].image)}
+                              <CachedImage
+                                src={shotFrames[0].image}
                                 alt={shot.shotCode}
                                 className="w-full h-16 object-cover rounded-t"
                               />

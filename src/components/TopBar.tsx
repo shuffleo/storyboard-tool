@@ -414,13 +414,22 @@ export function TopBar({ currentView, onViewChange, projectSource, syncStatus, o
                         backgroundColor:
                           syncStatus === 'connected' ? '#22c55e' :
                           syncStatus === 'connecting' ? '#eab308' :
+                          syncStatus === 'disconnected' && projectSource === 'fsa' ? '#6b7280' :
+                          syncStatus === 'disconnected' ? '#ef4444' :
                           '#6b7280',
+                        animation:
+                          syncStatus === 'connecting' ? 'pulse 1.5s ease-in-out infinite' :
+                          syncStatus === 'disconnected' && projectSource !== 'fsa' && projectSource !== 'indexeddb' ? 'pulse 2s ease-in-out infinite' :
+                          'none',
                       }}
                     />
                     {syncStatus === 'connected' ? 'Live' :
-                     syncStatus === 'connecting' ? 'Connecting...' :
+                     syncStatus === 'connecting' ? 'Reconnecting...' :
+                     syncStatus === 'disconnected' && projectSource === 'fsa' ? 'Local Folder' :
+                     syncStatus === 'disconnected' && projectSource === 'indexeddb' ? 'Offline (Internal)' :
                      projectSource === 'fsa' ? 'Local Folder' :
-                     projectSource === 'companion' ? 'Companion' : 'Internal Storage'}
+                     'Internal Storage'}
+                    <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
                   </div>
                 )}
                 <button
