@@ -12,7 +12,8 @@
     "test:e2e:visual": "vitest run tests/e2e/ --fileParallelism=false",
     "server:start": "tsx server/index.ts",
     "server:dev": "tsx watch server/index.ts",
-    "test:server": "vitest run server/"
+    "test:server": "vitest run server/",
+    "lint:storyboard": "tsx server/lint.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -28,6 +29,7 @@
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
     "remark-frontmatter": "^5.0.0",
     "remark-parse": "^11.0.0",
     "remark-stringify": "^11.0.0",

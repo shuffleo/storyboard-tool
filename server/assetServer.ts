@@ -10,7 +10,7 @@ export interface AssetServerOptions {
 
 export function startAssetServer(options: AssetServerOptions) {
   const { port, projectPath } = options;
-  const assetsDir = resolve(join(projectPath, 'assets'));
+  const assetsDir = resolve(projectPath);
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     res.setHeader('Access-Control-Allow-Origin', '*');

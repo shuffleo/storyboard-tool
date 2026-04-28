@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useMemo } from 'react';
-import { useStore } from '../store/useStore';
+import { useStore, resolveAssetUrl } from '../store/useStore';
 import { Shot } from '../types';
 
 interface CanvasViewProps {
@@ -263,7 +263,7 @@ export function CanvasView({ onSelect }: CanvasViewProps) {
               >
                 {shotFrames.length > 0 ? (
                   <img
-                    src={shotFrames[0].image}
+                    src={resolveAssetUrl(shotFrames[0].image)}
                     alt={node.shot.shotCode}
                     className="w-full h-12 object-cover rounded-t-lg"
                   />

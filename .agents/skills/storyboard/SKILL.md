@@ -4,23 +4,77 @@ Use this skill when working with storyboard projects stored as markdown files,
 or when calling storyboard MCP tools. Covers the markdown format spec, data
 model, file conventions, and all available MCP tools.
 
-## Folder Structure
+**MANDATORY: You MUST run the storyboard linter after every batch of file
+edits and before every `storyboard_sync("pull")` call:**
+
+```bash
+npx tsx server/lint.ts --project /path/to/storyboard
+```
+
+**Do NOT sync or proceed if the linter reports errors.** Fix all errors first.
+
+## Storyboard Folder Rules
+
+**ONLY these items belong inside the storyboard folder:**
 
 ```
 my-storyboard/
-├── project.md           # Project metadata (title, fps, aspect ratio, notes)
+├── project.md           # Project metadata (required, exactly this name)
 ├── scene-001.md         # One file per scene, zero-padded 3-digit number
 ├── scene-002.md
 ├── scene-NNN.md
 └── assets/              # Media files (images, audio, video)
-    ├── sc001-sh010-f01.png
-    └── custom-name.png
+    ├── char/            # Character references (optional subfolder)
+    ├── scene/           # Scene/location art (optional subfolder)
+    └── sc001-sh010-f01.png
 ```
 
-- Files sorted alphabetically by filename = scene order
-- `project.md` is always present and always named exactly this
-- Scene files match pattern `scene-NNN.md`
-- Assets can use any filename; recommended: `sc{NNN}-sh{NNN}-f{NN}.{ext}`
+**Everything else goes OUTSIDE the storyboard folder.** The companion server
+ignores any `.md` file that isn't `project.md` or `scene-NNN.md`. Placing
+other files (prompts, notes, shot lists) inside the storyboard folder is a
+silent mistake — they won't appear in the tool.
+
+Files sorted alphabetically by filename = scene order. Always zero-pad to
+3 digits (`scene-001.md`, not `scene-1.md`).
+
+## Frontmatter Rules
+
+Frontmatter MUST be valid YAML between two `---` lines. No blank lines before
+the first key. No markdown headings (`#`, `##`) inside the block.
+
+**Correct:**
+
+```yaml
+---
+id: sc001
+scene_number: "1"
+order_index: 0
+---
+```
+
+**WRONG — do not do this:**
+
+```yaml
+---
+
+## id: sc001
+scene_number: "1"
+order_index: 0
+
+# Scene 1: Title
+```
+
+This breaks parsing: `## id:` is a markdown heading (not YAML), the title is
+consumed as frontmatter, and the closing `---` is never found.
+
+### Required fields
+
+
+| File           | Required fields                     |
+| -------------- | ----------------------------------- |
+| `project.md`   | `id`, `fps`, `aspect_ratio`         |
+| `scene-NNN.md` | `id`, `scene_number`, `order_index` |
+
 
 ## Markdown Format
 
@@ -92,6 +146,20 @@ Script text for the next shot.
 ![frame-2](assets/sc001-sh020-f02.png "Second frame")
 ```
 
+## H3 Headings = Shots (Critical Rule)
+
+**Every `###` heading in a scene file is parsed as a shot.** There are no
+exceptions. If you use `### Clip Mapping` or `### Notes` or any other H3,
+the parser creates a phantom shot with default 1000ms duration.
+
+Use `##` (H2) for non-shot sections:
+
+- `## Notes` — scene-level notes
+- `## Clip Mapping` — audio/clip tables
+- `## References` — any other metadata
+
+Only `### {duration}: {title}` headings should appear in scene files.
+
 ### Shot Heading Syntax
 
 ```
@@ -119,13 +187,52 @@ Place immediately before the `###` heading:
 - `tags` (string array, optional): classification tags
 - If missing, the parser auto-generates an id
 
-### Frame Image Syntax
+## Image References
+
+Use the standard markdown image syntax for local assets:
 
 ```markdown
 ![{label}](assets/{path} "{caption}")
 ```
 
+External URLs are also supported:
+
+```markdown
+![reference](https://example.com/image.png "External reference")
+```
+
 Multiple frames per shot allowed. Order = appearance order in file.
+
+Local image paths MUST start with `assets/` and the file must exist.
+External URLs (http/https) are rendered directly without proxying through
+the asset server. Use local assets for production frames and external URLs
+for references or mood boards.
+
+**Do NOT use bare text as image placeholders.** Writing `catchpit` or `taxi`
+on a line by itself is parsed as script text, not a frame reference. If a
+shot doesn't have images yet, simply omit the image line.
+
+## Lint Before Sync (Mandatory)
+
+**You MUST run the linter** after every batch of file edits, after adding
+assets, and before every `storyboard_sync("pull")` call:
+
+```bash
+npx tsx server/lint.ts --project /path/to/storyboard
+```
+
+The linter validates:
+
+- Frontmatter YAML syntax and required fields
+- H3 headings follow `{duration}: {title}` format
+- No non-standard `.md` files in the folder
+- No bare text asset placeholders
+- Image paths start with `assets/`
+- Referenced image files actually exist on disk
+- External URLs (http/https) are allowed and skipped for existence checks
+
+**Do NOT call `storyboard_sync("pull")` if the linter reports errors.**
+Fix all errors first, then re-lint until clean.
 
 ## Data Model
 
@@ -140,6 +247,36 @@ Multiple frames per shot allowed. Order = appearance order in file.
 
 Shot codes (010, 020, 030) are computed from position, never stored in markdown.
 `Sequence` and `Version` types are not used in markdown format.
+
+## Recommended Project Layout
+
+Keep the storyboard folder clean. Put supporting material outside:
+
+```
+my-project/
+├── storyboard/              # ONLY project.md + scene-NNN.md + assets/
+│   ├── project.md
+│   ├── scene-001.md
+│   ├── scene-002.md
+│   └── assets/
+│       ├── char/            # Character reference images
+│       └── scene/           # Scene/location art
+├── docs/                    # Domain bibles (outside storyboard)
+│   ├── CHARACTERS.md
+│   ├── GEOGRAPHY.md
+│   ├── ART_STYLE.md
+│   └── AUDIO_CLIPS.md
+├── assets/                  # Source media, generation scripts
+│   ├── refs/
+│   │   ├── PROMPTS.md       # Image generation prompts
+│   │   └── generate_all.py
+│   └── clips/               # Audio clips
+├── SHOT_LIST.md             # Full director-style breakdown
+└── .agents/skills/          # Agent skill files
+```
+
+This separation keeps the storyboard tool's parser happy while organizing
+all production materials.
 
 ## When to Edit Files Directly vs Use MCP Tools
 
@@ -260,6 +397,8 @@ Control companion server sync state.
 - Prefer batch `storyboard_write` over many sequential single operations
 - Use descriptive shot titles (they appear in the PWA timeline)
 - Set duration in the heading (e.g., `### 2s: Shot title`), not via metadata
+- Run `npx tsx server/lint.ts --project /path` before syncing to catch errors
+- Use `##` (H2) for non-shot sections, never `###` (H3) for metadata/tables
 
 ## Common Patterns
 
@@ -268,7 +407,8 @@ Control companion server sync state.
 1. Parse the script into logical segments
 2. Create `scene-NNN.md` files with titles and summaries
 3. Add shots to each scene with duration estimates and script text
-4. Call `storyboard_sync("pull")` if companion is running
+4. Run `npx tsx server/lint.ts --project /path` to validate
+5. Call `storyboard_sync("pull")` if companion is running
 
 ### Generate images for all shots
 
@@ -276,6 +416,7 @@ Control companion server sync state.
 2. Generate image prompts from script text and tags
 3. Call image generation API
 4. `storyboard_assets("add", { data, filename, shot_id })` for each image
+5. Run `npx tsx server/lint.ts --project /path` to verify all paths resolve
 
 ### Adjust animatic timing
 

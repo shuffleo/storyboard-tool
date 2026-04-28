@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { useStore } from '../store/useStore';
+import { useStore, resolveAssetUrl } from '../store/useStore';
 import { Shot } from '../types';
 import { debugLogger } from '../utils/debug';
 
@@ -115,7 +115,8 @@ export function AnimaticsView({ onSelect }: AnimaticsViewProps) {
         .filter(f => f && f.shotId === currentFrame.shotId)
         .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
       if (shotFrames.length === 0) return null;
-      return shotFrames[currentFrame.frameIndex]?.image || shotFrames[0]?.image || null;
+      const raw = shotFrames[currentFrame.frameIndex]?.image || shotFrames[0]?.image || null;
+      return raw ? resolveAssetUrl(raw) : null;
     } catch (error) {
       console.error('Error getting current frame image:', error);
       return null;
@@ -682,7 +683,7 @@ export function AnimaticsView({ onSelect }: AnimaticsViewProps) {
               
               
               const shotFrames = frames.filter(f => f && f.shotId === frame.shotId).sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
-              const frameImage = shotFrames[0]?.image;
+              const frameImage = resolveAssetUrl(shotFrames[0]?.image);
               const isSelected = selectedShotId === frame.shotId;
               const isDragging = dragShotId === frame.shotId;
               const isFromOtherScene = dragShotId && frame.shot.sceneId !== draggingSceneId;

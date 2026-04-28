@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { useStore } from '../store/useStore';
+import { useStore, resolveAssetUrl } from '../store/useStore';
 import { Shot } from '../types';
 
 interface TableViewProps {
@@ -451,7 +451,7 @@ export function TableView({ onSelect }: TableViewProps) {
           }}
         >
           <img
-            src={hoverPreview.image}
+            src={resolveAssetUrl(hoverPreview.image)}
             alt="Preview"
             className="max-w-md max-h-md border-2 border-slate-600 rounded shadow-2xl"
             style={{ maxWidth: '400px', maxHeight: '400px', objectFit: 'contain' }}
@@ -992,7 +992,7 @@ const ImageThumbnail = React.memo(function ImageThumbnail({
         onMouseMove={handleMouseMove}
       >
         <img
-          src={frames[currentImageIndex]?.image || frames[0]?.image}
+          src={resolveAssetUrl(frames[currentImageIndex]?.image || frames[0]?.image)}
           alt=""
           className="w-full h-full object-cover rounded border border-slate-600"
         />

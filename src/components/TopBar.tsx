@@ -4,6 +4,7 @@ import { useStore, ProjectSource } from '../store/useStore';
 import type { SyncStatus } from '../sync/wsClient';
 import { exportToCSV, exportStoryboardPDF, exportToZIP, exportAnimaticsToMP4, downloadFile, importFromCSV, importFromZIP, importImages, exportIndexedDB, importIndexedDB } from '../utils/importExport';
 import { debugLogger } from '../utils/debug';
+import { MarkdownField } from './MarkdownField';
 
 interface TopBarProps {
   currentView: ViewType;
@@ -748,17 +749,11 @@ export function TopBar({ currentView, onViewChange, projectSource, syncStatus, o
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Style Notes</label>
-                    <textarea
+                    <MarkdownField
                       value={project?.styleNotes || ''}
-                      onChange={(e) => updateProject({ styleNotes: e.target.value })}
-                      onKeyDown={(e) => {
-                        if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
-                          return;
-                        }
-                      }}
+                      onChange={(val) => updateProject({ styleNotes: val })}
                       rows={4}
                       placeholder="Enter style notes..."
-                      className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
                     />
                   </div>
                   <div>
@@ -781,17 +776,11 @@ export function TopBar({ currentView, onViewChange, projectSource, syncStatus, o
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Global Notes</label>
-                    <textarea
+                    <MarkdownField
                       value={project?.globalNotes || ''}
-                      onChange={(e) => updateProject({ globalNotes: e.target.value })}
-                      onKeyDown={(e) => {
-                        if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
-                          return;
-                        }
-                      }}
+                      onChange={(val) => updateProject({ globalNotes: val })}
                       rows={6}
                       placeholder="Enter global notes..."
-                      className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
                     />
                   </div>
                 </div>

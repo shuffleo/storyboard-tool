@@ -37,9 +37,13 @@ export class StateManager {
 
     const entries = readdirSync(this.projectPath);
     for (const entry of entries) {
-      if (entry.endsWith('.md') && (entry === 'project.md' || /^scene-\d+\.md$/.test(entry))) {
-        const content = readFileSync(join(this.projectPath, entry), 'utf-8');
-        files.set(entry, content);
+      if (entry.endsWith('.md')) {
+        if (entry === 'project.md' || /^scene-\d+\.md$/.test(entry)) {
+          const content = readFileSync(join(this.projectPath, entry), 'utf-8');
+          files.set(entry, content);
+        } else {
+          console.warn(`Ignoring non-standard file "${entry}" in project folder. Only project.md and scene-NNN.md are loaded.`);
+        }
       }
     }
 

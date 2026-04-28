@@ -1,7 +1,8 @@
 import React from 'react';
-import { useStore } from '../store/useStore';
+import { useStore, resolveAssetUrl } from '../store/useStore';
 import { Shot, Scene, StoryboardFrame, Project } from '../types';
 import { debugLogger } from '../utils/debug';
+import { MarkdownField } from './MarkdownField';
 
 interface InspectorProps {
   selectedId: string | null;
@@ -264,18 +265,11 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Global Notes</label>
-              <textarea
+              <MarkdownField
                 value={(item as Project).globalNotes}
-                onChange={(e) => updateFn({ globalNotes: e.target.value })}
-                onKeyDown={(e) => {
-                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
-                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
-                    return; // Let browser handle these
-                  }
-                }}
+                onChange={(val) => updateFn({ globalNotes: val })}
                 rows={6}
                 placeholder="Click to edit"
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
           </>
@@ -317,34 +311,20 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Summary</label>
-              <textarea
+              <MarkdownField
                 value={(item as Scene).summary}
-                onChange={(e) => updateFn({ summary: e.target.value })}
-                onKeyDown={(e) => {
-                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
-                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
-                    return; // Let browser handle these
-                  }
-                }}
+                onChange={(val) => updateFn({ summary: val })}
                 rows={3}
                 placeholder="Click to edit"
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">Notes</label>
-              <textarea
-                value={(item as Scene).notes}
-                onChange={(e) => updateFn({ notes: e.target.value })}
-                onKeyDown={(e) => {
-                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
-                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
-                    return; // Let browser handle these
-                  }
-                }}
+              <MarkdownField
+                value={(item as Scene).notes || ''}
+                onChange={(val) => updateFn({ notes: val })}
                 rows={4}
                 placeholder="Click to edit"
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
           </>
@@ -447,18 +427,11 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1 uppercase">General Notes</label>
-              <textarea
+              <MarkdownField
                 value={(item as Shot).generalNotes}
-                onChange={(e) => updateFn({ generalNotes: e.target.value })}
-                onKeyDown={(e) => {
-                  // Allow standard keyboard shortcuts (Cmd/Ctrl+A, C, V, X, Z)
-                  if ((e.metaKey || e.ctrlKey) && ['a', 'c', 'v', 'x', 'z'].includes(e.key.toLowerCase())) {
-                    return; // Let browser handle these
-                  }
-                }}
+                onChange={(val) => updateFn({ generalNotes: val })}
                 rows={3}
                 placeholder="Click to edit"
-                className="w-full px-3 py-2 border border-slate-600 bg-slate-900 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             {/* Image Carousel */}
@@ -640,7 +613,7 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
                   <div className="relative min-h-[120px] flex items-center justify-center">
                     {currentFrame?.image ? (
                       <img
-                        src={currentFrame.image}
+                        src={resolveAssetUrl(currentFrame.image)}
                         alt={`Frame ${currentImageIndex + 1}`}
                         className="w-full rounded-md border border-slate-600"
                         onError={(e) => {
@@ -731,7 +704,7 @@ export function Inspector({ selectedId, selectedType, currentView, onClose }: In
             </div>
             <div>
               <img
-                src={(item as StoryboardFrame).image}
+                src={resolveAssetUrl((item as StoryboardFrame).image)}
                 alt={(item as StoryboardFrame).caption}
                 className="w-full rounded-md border border-slate-600"
               />

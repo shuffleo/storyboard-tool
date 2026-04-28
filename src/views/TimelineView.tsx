@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useStore } from '../store/useStore';
+import { useStore, resolveAssetUrl } from '../store/useStore';
 import { Shot } from '../types';
 
 interface TimelineViewProps {
@@ -134,7 +134,7 @@ export function TimelineView({ onSelect }: TimelineViewProps) {
                           >
                             {shotFrames.length > 0 ? (
                               <img
-                                src={shotFrames[0].image}
+                                src={resolveAssetUrl(shotFrames[0].image)}
                                 alt={shot.shotCode}
                                 className="w-full h-16 object-cover rounded-t"
                               />

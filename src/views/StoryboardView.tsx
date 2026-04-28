@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { useStore } from '../store/useStore';
+import { useStore, resolveAssetUrl } from '../store/useStore';
 import { debugLogger } from '../utils/debug';
+import { MarkdownInline } from '../components/MarkdownField';
 
 interface StoryboardViewProps {
   onSelect: (id: string, type: 'project' | 'scene' | 'shot' | 'frame') => void;
@@ -631,7 +632,7 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
             {shotFrames.length > 0 ? (
               <>
                 <img
-                  src={shotFrames[currentImageIndex.get(shot.id) || 0]?.image || shotFrames[0].image}
+                  src={resolveAssetUrl(shotFrames[currentImageIndex.get(shot.id) || 0]?.image || shotFrames[0].image)}
                   alt={shot.shotCode}
                   className="absolute inset-0 w-full h-full object-cover rounded"
                   style={{ objectFit: 'cover' }}
@@ -691,7 +692,9 @@ export function StoryboardView({ onSelect }: StoryboardViewProps) {
         </div>
 
         {density === 'detailed' && shot.scriptText && (
-          <div className="text-xs text-slate-400 mb-2 line-clamp-2">{shot.scriptText}</div>
+          <div className="text-xs text-slate-400 mb-2 line-clamp-2">
+            <MarkdownInline value={shot.scriptText} />
+          </div>
         )}
         </div>
       </div>

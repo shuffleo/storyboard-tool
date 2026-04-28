@@ -823,6 +823,16 @@ export const useStore = create<Store>((set, get) => ({
   },
 }));
 
+export function resolveAssetUrl(path: string | undefined): string {
+  if (!path) return '';
+  if (/^https?:\/\//.test(path)) return path;
+  const state = useStore.getState();
+  if (state.projectSource === 'companion' && state.syncClient) {
+    return `${state.syncClient.assetBaseUrl}/${path}`;
+  }
+  return path;
+}
+
 if (typeof window !== 'undefined') {
   (window as any).__storyboardStore = useStore;
 }
